@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+.DS_Store
+lan_pulse/temp_files/
+lan_pulse/*.db
+*.log
+cookies.txt

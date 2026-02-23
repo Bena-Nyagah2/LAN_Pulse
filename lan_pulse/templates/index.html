@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAN Pulse</title>
+    <!-- Vendor CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/highlight/github-dark.min.css') }}">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fa-solid fa-bolt"></i> LAN Pulse</h2>
+                <span id="connection-status" class="status-indicator">Connecting...</span>
+            </div>
+
+            <nav id="main-nav">
+                <button class="nav-btn active" data-target="chat-area"><i class="fa-solid fa-comments"></i> Chat</button>
+                <button class="nav-btn" data-target="clipboard-area"><i class="fa-solid fa-clipboard"></i> Clipboard</button>
+                <button class="nav-btn" data-target="whiteboard-area"><i class="fa-solid fa-pen-to-square"></i> Whiteboard</button>
+            </nav>
+
+            <div class="user-list-container">
+                <h3>Users</h3>
+                <ul id="user-list">
+                    <!-- Users will be injected here -->
+                </ul>
+            </div>
+            <div class="my-profile">
+                <div class="avatar" id="my-avatar"></div>
+                <div class="name" id="my-name">Guest</div>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main id="chat-area" class="tab-content active">
+            <div id="messages-container">
+                <!-- Messages will be injected here -->
+            </div>
+            <div id="typing-indicator"></div>
+            <div id="input-area">
+                <input type="file" id="file-input" style="display: none;">
+                <button id="file-btn"><i class="fa-solid fa-paperclip"></i></button>
+                <button id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
+                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
+            <div id="recording-ui" style="display: none;">
+                <span id="recording-status">Recording...</span>
+                <span id="recording-timer">0:00</span>
+                <button id="cancel-recording"><i class="fa-solid fa-times"></i></button>
+                <button id="stop-recording"><i class="fa-solid fa-check"></i></button>
+            </div>
+        </main>
+
+        <!-- Clipboard Area -->
+        <main id="clipboard-area" class="tab-content" style="display: none;">
+            <div class="clipboard-input-container">
+                <textarea id="clipboard-input" placeholder="Paste text or code here..."></textarea>
+                <button id="share-clipboard-btn"><i class="fa-solid fa-share"></i> Share</button>
+            </div>
+            <div id="clipboard-entries">
+                <!-- Entries injected here -->
+            </div>
+        </main>
+
+        <!-- Whiteboard Area -->
+        <main id="whiteboard-area" class="tab-content" style="display: none;">
+            <div class="whiteboard-toolbar">
+                <input type="color" id="draw-color" value="#000000">
+                <input type="range" id="draw-size" min="1" max="20" value="5">
+                <button id="draw-tool-pen" class="tool-btn active"><i class="fa-solid fa-pen"></i></button>
+                <button id="draw-tool-eraser" class="tool-btn"><i class="fa-solid fa-eraser"></i></button>
+                <button id="clear-board-btn"><i class="fa-solid fa-trash"></i> Clear</button>
+            </div>
+            <div class="canvas-container">
+                <canvas id="whiteboard" width="800" height="500"></canvas>
+            </div>
+        </main>
+    </div>
+
+    <!-- Profile Modal -->
+    <div id="profile-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span id="close-modal" class="close">&times;</span>
+            <h2>Edit Profile</h2>
+            <div class="form-group">
+                <label for="profile-name">Display Name</label>
+                <input type="text" id="profile-name" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label for="profile-color">Color</label>
+                <input type="color" id="profile-color">
+            </div>
+            <button id="save-profile-btn">Save Changes</button>
+        </div>
+    </div>
+
+    <!-- Vendor Scripts -->
+    <script src="{{ url_for('static', filename='vendor/socket.io/socket.io.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/marked/marked.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/highlight/highlight.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/qrcode/qrcode.min.js') }}"></script>
+
+    <!-- Custom Script -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

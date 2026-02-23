@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAN Pulse - Admin Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .admin-container {
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .admin-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #444;
+            padding-bottom: 1rem;
+        }
+        .section {
+            background-color: #2c2c2c;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            text-align: left;
+            padding: 0.8rem;
+            border-bottom: 1px solid #444;
+        }
+        th {
+            background-color: #333;
+        }
+        .action-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            color: white;
+            font-size: 0.9rem;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+        }
+        .btn-warning {
+            background-color: #ffc107;
+            color: #212529;
+        }
+        .broadcast-form {
+            display: flex;
+            gap: 1rem;
+        }
+        .broadcast-input {
+            flex-grow: 1;
+            padding: 0.8rem;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background-color: #1a1a1a;
+            color: white;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .stat-card {
+            background-color: #333;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+        .stat-label {
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>Admin Dashboard</h1>
+            <div>
+                <a href="{{ url_for('index') }}" class="action-btn" style="background-color: #007bff;">Back to Chat</a>
+                <a href="{{ url_for('logout') }}" class="action-btn btn-danger">Logout</a>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>System Stats</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.uptime }}s</div>
+                    <div class="stat-label">Uptime</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.active_users }}</div>
+                    <div class="stat-label">Active Users</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.memory_usage }}%</div>
+                    <div class="stat-label">Memory Usage</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">{{ stats.active_files }}</div>
+                    <div class="stat-label">Active Files</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>System Broadcast</h2>
+            <div class="broadcast-form">
+                <input type="text" id="broadcast-msg" class="broadcast-input" placeholder="Type a system message...">
+                <button id="send-broadcast" class="action-btn btn-warning">Broadcast</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Active Users</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>ID</th>
+                        <th>Status</th>
+                        <th>Last Seen</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="user-table-body">
+                    {% for user in users %}
+                    <tr>
+                        <td><span style="color: {{ user.color }}">{{ user.name }}</span></td>
+                        <td>{{ user.id }}</td>
+                        <td>{{ user.status }}</td>
+                        <td>{{ user.last_seen }}</td>
+                        <td>
+                            <button class="action-btn btn-danger" onclick="kickUser('{{ user.id }}')">Kick</button>
+                            {% if user.is_muted %}
+                            <button class="action-btn btn-warning" onclick="unmuteUser('{{ user.id }}')">Unmute</button>
+                            {% else %}
+                            <button class="action-btn btn-warning" onclick="muteUser('{{ user.id }}')">Mute</button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Files</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for file in files %}
+                    <tr>
+                        <td>{{ file.filename }}</td>
+                        <td>{{ file.file_type }}</td>
+                        <td>{{ file.size }}</td>
+                        <td>
+                            <a href="{{ url_for('serve_file', file_id=file.id) }}" class="action-btn" style="background-color: #28a745;">Download</a>
+                            <a href="{{ url_for('delete_file_route', file_id=file.id) }}" class="action-btn btn-danger" onclick="return confirm('Delete this file?')">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Clipboard Entries</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Content Preview</th>
+                        <th>Type</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in clipboard_entries %}
+                    <tr>
+                        <td>{{ entry.username }}</td>
+                        <td>{{ entry.content[:50] }}...</td>
+                        <td>{{ entry.type }}</td>
+                        <td>
+                            <a href="{{ url_for('delete_clipboard_route', entry_id=entry.id) }}" class="action-btn btn-danger" onclick="return confirm('Delete this entry?')">Delete</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='vendor/socket.io/socket.io.min.js') }}"></script>
+    <script>
+        const socket = io();
+
+        document.getElementById('send-broadcast').addEventListener('click', () => {
+            const msg = document.getElementById('broadcast-msg').value;
+            if (msg) {
+                socket.emit('admin_broadcast', { message: msg });
+                document.getElementById('broadcast-msg').value = '';
+                alert('Broadcast sent');
+            }
+        });
+
+        function kickUser(userId) {
+            if (confirm('Are you sure you want to kick this user?')) {
+                socket.emit('admin_kick_user', { user_id: userId });
+            }
+        }
+
+        function muteUser(userId) {
+            socket.emit('admin_mute_user', { user_id: userId });
+            location.reload();
+        }
+
+        function unmuteUser(userId) {
+            socket.emit('admin_unmute_user', { user_id: userId });
+            location.reload();
+        }
+    </script>
+</body>
+</html>

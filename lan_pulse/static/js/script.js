@@ -44,6 +44,32 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileNameInput = document.getElementById('profile-name');
     const profileColorInput = document.getElementById('profile-color');
 
+    // Theme
+    const themeBtn = document.getElementById('theme-toggle');
+    const themeIcon = themeBtn.querySelector('i');
+
+    const toggleTheme = () => {
+        const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+        if (isDark) {
+            document.documentElement.setAttribute('data-theme', 'light');
+            themeIcon.className = 'fa-solid fa-moon';
+            localStorage.setItem('theme', 'light');
+        } else {
+            document.documentElement.setAttribute('data-theme', 'dark');
+            themeIcon.className = 'fa-solid fa-sun';
+            localStorage.setItem('theme', 'dark');
+        }
+    };
+
+    // Load theme
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        themeIcon.className = 'fa-solid fa-moon';
+    }
+
+    themeBtn.addEventListener('click', toggleTheme);
+
     // Whiteboard
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
@@ -57,6 +83,15 @@ document.addEventListener('DOMContentLoaded', () => {
     let myUserId = localStorage.getItem('lan_pulse_user_id');
     let myUser = null;
     let typingTimeout = null;
+
+    // QR Code
+    const serverUrl = window.location.href;
+    document.getElementById('server-url').innerText = serverUrl;
+    new QRCode(document.getElementById("qrcode"), {
+        text: serverUrl,
+        width: 128,
+        height: 128
+    });
 
     // Load offline history
     const offlineHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
@@ -695,15 +730,23 @@ document.addEventListener('DOMContentLoaded', () => {
     // Profile Modal Listeners
     myProfileDiv.addEventListener('click', () => {
         profileModal.style.display = 'flex';
+        // Force reflow for transition
+        void profileModal.offsetWidth;
+        profileModal.classList.add('show');
     });
 
-    closeModal.addEventListener('click', () => {
-        profileModal.style.display = 'none';
-    });
+    const hideModal = () => {
+        profileModal.classList.remove('show');
+        setTimeout(() => {
+            profileModal.style.display = 'none';
+        }, 300);
+    };
+
+    closeModal.addEventListener('click', hideModal);
 
     window.addEventListener('click', (event) => {
         if (event.target == profileModal) {
-            profileModal.style.display = 'none';
+            hideModal();
         }
     });
 
@@ -713,7 +756,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (name) {
             socket.emit('update_profile', { name, color });
-            profileModal.style.display = 'none';
+            hideModal();
         } else {
             alert("Name cannot be empty");
         }

@@ -1,6 +1,3 @@
-import eventlet
-eventlet.monkey_patch()
-
 from flask import Flask, render_template, request, send_file, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import socket
@@ -9,6 +6,7 @@ import random
 import os
 import uuid
 import time
+import threading
 from werkzeug.utils import secure_filename
 import functools
 import psutil
@@ -19,7 +17,8 @@ app.config['UPLOAD_FOLDER'] = 'lan_pulse/temp_files'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
 app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD', 'admin')
 
-socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins='*')
+# Use threading mode to avoid C-extension build errors on Windows (greenlet/eventlet)
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins='*')
 
 # Ensure upload folder exists
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -49,12 +48,14 @@ def get_local_ip():
 # Cleanup Task
 def cleanup_files():
     while True:
-        eventlet.sleep(3600)  # Check every hour
+        time.sleep(3600)  # Check every hour
         deleted_count = database.delete_old_files(86400) # Delete files older than 24h
         if deleted_count > 0:
             print(f"Cleaned up {deleted_count} old files")
 
-eventlet.spawn(cleanup_files)
+# Start background thread
+cleanup_thread = threading.Thread(target=cleanup_files, daemon=True)
+cleanup_thread.start()
 
 # Auth Decorator
 def login_required(f):
@@ -423,4 +424,5 @@ if __name__ == '__main__':
     local_ip = get_local_ip()
     print(f" * LAN Pulse server running at http://{local_ip}:5000")
     print(f" * Admin Password: {app.config['ADMIN_PASSWORD']}")
-    socketio.run(app, host='0.0.0.0', port=5000)
+    # Allow unsafe werkzeug for local/development use as per requirements
+    socketio.run(app, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)

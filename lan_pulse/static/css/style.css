@@ -10,6 +10,26 @@
     --font-stack: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
+[data-theme="light"] {
+    --bg-color: #f8f9fa;
+    --sidebar-bg: #ffffff;
+    --text-color: #212529;
+    --primary-color: #007bff;
+    --secondary-color: #e9ecef;
+    --message-bg-other: #e9ecef;
+    --message-bg-me: #007bff;
+    --border-color: #dee2e6;
+}
+
+[data-theme="light"] .message.mine {
+    color: white;
+}
+
+[data-theme="light"] #message-input {
+    background-color: #ffffff;
+    color: #212529;
+}
+
 body, html {
     margin: 0;
     padding: 0;
@@ -18,6 +38,7 @@ body, html {
     color: var(--text-color);
     height: 100%;
     overflow: hidden;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 #app {
@@ -34,6 +55,8 @@ body, html {
     flex-direction: column;
     padding: 1rem;
     box-sizing: border-box;
+    transition: background-color 0.3s, border-color 0.3s;
+    position: relative;
 }
 
 .sidebar-header {
@@ -48,6 +71,18 @@ body, html {
 .sidebar-header h2 {
     margin: 0;
     font-size: 1.2rem;
+}
+
+.theme-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 1rem;
+    z-index: 10;
 }
 
 #main-nav {
@@ -69,10 +104,11 @@ body, html {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
+    transition: all 0.2s;
 }
 
 .nav-btn:hover {
-    background-color: rgba(255,255,255,0.1);
+    background-color: var(--secondary-color);
 }
 
 .nav-btn.active {
@@ -131,7 +167,7 @@ body, html {
 }
 
 .my-profile:hover {
-    background-color: rgba(255,255,255,0.05);
+    background-color: var(--secondary-color);
 }
 
 .avatar {
@@ -160,10 +196,17 @@ body, html {
     position: relative;
     background-color: var(--bg-color);
     height: 100vh;
+    transition: background-color 0.3s;
 }
 
 .tab-content.active {
     display: flex;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* Chat Area Specifics */
@@ -182,6 +225,12 @@ body, html {
     border-radius: 8px;
     position: relative;
     word-wrap: break-word;
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { transform: translateY(10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
 }
 
 .message.mine {
@@ -202,6 +251,14 @@ body, html {
     color: #ccc;
     display: flex;
     justify-content: space-between;
+}
+
+[data-theme="light"] .message-header {
+    color: #666;
+}
+
+[data-theme="light"] .message.mine .message-header {
+    color: #eee;
 }
 
 .message-header .username {
@@ -318,6 +375,7 @@ body, html {
     display: flex;
     align-items: center;
     position: relative;
+    transition: background-color 0.3s;
 }
 
 #message-input {
@@ -466,6 +524,7 @@ body, html {
     border-radius: 8px;
     padding: 1rem;
     margin-bottom: 1rem;
+    animation: slideIn 0.3s ease;
 }
 
 .clipboard-header {
@@ -600,6 +659,14 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+
+.modal.show {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .modal-content {
@@ -612,6 +679,12 @@ body, html {
     border-radius: 8px;
     position: relative;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s;
+}
+
+.modal.show .modal-content {
+    transform: scale(1);
 }
 
 .close {

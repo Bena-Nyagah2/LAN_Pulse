@@ -44,6 +44,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const profileNameInput = document.getElementById('profile-name');
     const profileColorInput = document.getElementById('profile-color');
 
+    // Mobile Sidebar
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const sidebar = document.getElementById('sidebar');
+    const mobileStatus = document.getElementById('mobile-status');
+
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('open');
+        });
+    }
+
+    // Close sidebar on navigation (mobile)
+    navBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.remove('open');
+            }
+        });
+    });
+
     // Theme
     const themeBtn = document.getElementById('theme-toggle');
     const themeIcon = themeBtn.querySelector('i');
@@ -92,12 +112,6 @@ document.addEventListener('DOMContentLoaded', () => {
         width: 128,
         height: 128
     });
-
-    // Load offline history
-    const offlineHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
-    if (offlineHistory.length > 0) {
-        offlineHistory.forEach(renderMessage);
-    }
 
     // Recording State
     let mediaRecorder = null;
@@ -209,6 +223,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Load offline history (Moved after renderMessage definition)
+    const offlineHistory = JSON.parse(localStorage.getItem('chat_history') || '[]');
+    if (offlineHistory.length > 0) {
+        offlineHistory.forEach(renderMessage);
+    }
+
     // Offline Logic
     const LOCAL_QUEUE_KEY = 'lan_pulse_queue';
 
@@ -234,18 +254,29 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.removeItem(LOCAL_QUEUE_KEY);
     };
 
+    const updateStatus = (text, type) => {
+        statusEl.innerText = text;
+        statusEl.className = `status-indicator status-${type}`;
+        if (mobileStatus) {
+            mobileStatus.innerText = text === 'Connected' ? '' : text;
+            mobileStatus.className = `status-indicator status-${type}`;
+            // Simplify mobile status
+            if (type === 'online') mobileStatus.innerHTML = '<i class="fa-solid fa-wifi"></i>';
+            else mobileStatus.innerHTML = '<i class="fa-solid fa-wifi" style="opacity: 0.5"></i>';
+        }
+    };
+
     socket.on('connect', () => {
         console.log('Connected');
-        statusEl.innerText = 'Connected';
-        statusEl.className = 'status-indicator status-online';
+        updateStatus('Connected', 'online');
+        console.log('Joining with user ID:', myUserId);
         socket.emit('join', { user_id: myUserId });
         processQueue();
     });
 
     socket.on('disconnect', () => {
         console.log('Disconnected');
-        statusEl.innerText = 'Offline (Queued)';
-        statusEl.className = 'status-indicator status-offline';
+        updateStatus('Offline (Queued)', 'offline');
     });
 
     const renderReactions = (groups, container, msgId) => {
@@ -556,6 +587,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     socket.on('user_info', (user) => {
+        // If server returns a different ID (e.g. forced reset), update ours
+        // But usually server respects ours if found.
         myUser = user;
         myUserId = user.id;
         localStorage.setItem('lan_pulse_user_id', user.id);

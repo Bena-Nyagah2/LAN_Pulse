@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>LAN Pulse</title>
     <!-- Vendor CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/css/all.min.css') }}">
@@ -10,9 +10,17 @@
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
 </head>
 <body>
     <div id="app">
+        <!-- Mobile Header -->
+        <header id="mobile-header">
+            <button id="sidebar-toggle"><i class="fa-solid fa-bars"></i></button>
+            <h2>LAN Pulse</h2>
+            <span id="mobile-status" class="status-indicator"></span>
+        </header>
+
         <!-- Sidebar -->
         <aside id="sidebar">
             <div class="sidebar-header">

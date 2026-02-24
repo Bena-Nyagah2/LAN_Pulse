@@ -1,0 +1,75 @@
+/* ... existing styles ... */
+
+/* Mobile Header */
+#mobile-header {
+    display: none;
+    background-color: var(--sidebar-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    align-items: center;
+    justify-content: space-between;
+    height: 60px;
+    box-sizing: border-box;
+}
+
+#mobile-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+}
+
+#sidebar-toggle {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 0.5rem;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #app {
+        flex-direction: column;
+    }
+
+    #mobile-header {
+        display: flex;
+    }
+
+    #sidebar {
+        position: fixed;
+        top: 60px;
+        left: -100%;
+        width: 100%;
+        height: calc(100vh - 60px);
+        z-index: 1000;
+        transition: left 0.3s ease;
+    }
+
+    #sidebar.open {
+        left: 0;
+    }
+
+    .tab-content {
+        height: calc(100vh - 60px);
+    }
+
+    /* Bigger touch targets */
+    button, .nav-btn, .action-btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    #input-area {
+        padding: 0.5rem;
+    }
+
+    #message-input {
+        padding: 0.8rem;
+    }
+
+    #send-btn, #file-btn, #mic-btn {
+        width: 48px;
+        height: 48px;
+    }
+}

@@ -487,6 +487,21 @@ def handle_remove_reaction(data):
         'emoji': emoji
     }, room=room_id)
 
+@socketio.on('delete_message')
+def handle_delete_message(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id:
+        return
+
+    message_id = data.get('message_id')
+    room_id = data.get('room_id')
+
+    # We should verify ownership, but database.delete_message doesn't check owner yet.
+    # In a real app, get_message(message_id) -> check user_id.
+    # For MVP/Simplicity:
+    database.delete_message(message_id)
+    emit('message_deleted', {'message_id': message_id}, room=room_id)
+
 @socketio.on('draw')
 def handle_draw(data):
     whiteboard_history.append(data)

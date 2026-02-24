@@ -55,8 +55,39 @@ body, html {
     flex-direction: column;
     padding: 1rem;
     box-sizing: border-box;
-    transition: background-color 0.3s, border-color 0.3s;
+    transition: all 0.3s;
     position: relative;
+    overflow: hidden;
+}
+
+#sidebar.collapsed {
+    width: 60px;
+    padding: 1rem 0.5rem;
+}
+
+#sidebar.collapsed .sidebar-header h2,
+#sidebar.collapsed .sidebar-header #connection-status,
+#sidebar.collapsed .user-list-container,
+#sidebar.collapsed .my-profile .name,
+#sidebar.collapsed .nav-btn span { /* Assuming we add spans to nav buttons later */
+    display: none;
+}
+
+#sidebar.collapsed .nav-btn {
+    justify-content: center;
+    padding: 0.5rem;
+}
+
+#sidebar.collapsed .sidebar-header {
+    justify-content: center;
+}
+
+#sidebar.collapsed .my-profile {
+    justify-content: center;
+}
+
+#sidebar.collapsed .avatar {
+    margin-right: 0;
 }
 
 .sidebar-header {
@@ -87,12 +118,13 @@ body, html {
 
 #main-nav {
     display: flex;
+    flex-direction: column;
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
 .nav-btn {
-    flex: 1;
+    width: 100%;
     background: transparent;
     border: 1px solid var(--border-color);
     color: var(--text-color);
@@ -216,6 +248,7 @@ body, html {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    padding-bottom: 2rem; /* Add padding to prevent content from being hidden */
 }
 
 .message {
@@ -308,17 +341,22 @@ body, html {
 /* Reactions */
 .reaction-bar {
     position: absolute;
-    top: -20px;
+    top: -30px;
     right: 10px;
     background-color: var(--sidebar-bg);
     border-radius: 20px;
-    padding: 2px 5px;
+    padding: 4px 8px;
     display: none; /* Hidden by default */
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     border: 1px solid var(--border-color);
+    z-index: 10;
+    flex-wrap: wrap;
+    max-width: 200px;
+    justify-content: center;
 }
 
-.message:hover .reaction-bar {
+.message:hover .reaction-bar,
+.message:active .reaction-bar { /* Show on touch/active for mobile */
     display: flex;
     gap: 5px;
 }
@@ -374,8 +412,10 @@ body, html {
     border-top: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    position: relative;
+    position: sticky; /* Keep at bottom */
+    bottom: 0;
     transition: background-color 0.3s;
+    z-index: 100;
 }
 
 #message-input {
@@ -883,6 +923,8 @@ body, html {
     flex-direction: column;
     background-color: var(--bg-color);
     position: relative;
+    height: 100%;
+    overflow: hidden;
 }
 
 #chat-header {
@@ -947,6 +989,89 @@ body, html {
     margin-right: 1rem;
     width: 20px;
     height: 20px;
+}
+
+/* Settings Tabs */
+.settings-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1rem;
+}
+
+.settings-tabs .tab-btn {
+    padding: 0.5rem 1rem;
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+}
+
+.settings-tabs .tab-btn.active {
+    border-bottom-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.btn-secondary {
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+/* Action List */
+.action-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.action-list button {
+    background: none;
+    border: 1px solid var(--border-color);
+    padding: 0.8rem;
+    border-radius: 4px;
+    color: var(--text-color);
+    cursor: pointer;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.action-list button:hover {
+    background-color: var(--secondary-color);
+}
+
+/* Reply Preview */
+#reply-preview {
+    background-color: var(--secondary-color);
+    padding: 0.5rem 1rem;
+    border-left: 4px solid var(--primary-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+#reply-preview .reply-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80%;
+}
+
+.reply-quote {
+    border-left: 2px solid var(--primary-color);
+    padding-left: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    opacity: 0.8;
+    background-color: rgba(0,0,0,0.1);
+    border-radius: 0 4px 4px 0;
+    padding: 4px;
 }
 
 @media (max-width: 768px) {

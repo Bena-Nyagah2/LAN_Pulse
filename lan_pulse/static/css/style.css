@@ -55,8 +55,39 @@ body, html {
     flex-direction: column;
     padding: 1rem;
     box-sizing: border-box;
-    transition: background-color 0.3s, border-color 0.3s;
+    transition: all 0.3s;
     position: relative;
+    overflow: hidden;
+}
+
+#sidebar.collapsed {
+    width: 60px;
+    padding: 1rem 0.5rem;
+}
+
+#sidebar.collapsed .sidebar-header h2,
+#sidebar.collapsed .sidebar-header #connection-status,
+#sidebar.collapsed .user-list-container,
+#sidebar.collapsed .my-profile .name,
+#sidebar.collapsed .nav-btn span { /* Assuming we add spans to nav buttons later */
+    display: none;
+}
+
+#sidebar.collapsed .nav-btn {
+    justify-content: center;
+    padding: 0.5rem;
+}
+
+#sidebar.collapsed .sidebar-header {
+    justify-content: center;
+}
+
+#sidebar.collapsed .my-profile {
+    justify-content: center;
+}
+
+#sidebar.collapsed .avatar {
+    margin-right: 0;
 }
 
 .sidebar-header {
@@ -217,6 +248,7 @@ body, html {
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    padding-bottom: 2rem; /* Add padding to prevent content from being hidden */
 }
 
 .message {
@@ -309,17 +341,22 @@ body, html {
 /* Reactions */
 .reaction-bar {
     position: absolute;
-    top: -20px;
+    top: -30px;
     right: 10px;
     background-color: var(--sidebar-bg);
     border-radius: 20px;
-    padding: 2px 5px;
+    padding: 4px 8px;
     display: none; /* Hidden by default */
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     border: 1px solid var(--border-color);
+    z-index: 10;
+    flex-wrap: wrap;
+    max-width: 200px;
+    justify-content: center;
 }
 
-.message:hover .reaction-bar {
+.message:hover .reaction-bar,
+.message:active .reaction-bar { /* Show on touch/active for mobile */
     display: flex;
     gap: 5px;
 }
@@ -375,8 +412,10 @@ body, html {
     border-top: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    position: relative;
+    position: sticky; /* Keep at bottom */
+    bottom: 0;
     transition: background-color 0.3s;
+    z-index: 100;
 }
 
 #message-input {
@@ -884,6 +923,8 @@ body, html {
     flex-direction: column;
     background-color: var(--bg-color);
     position: relative;
+    height: 100%;
+    overflow: hidden;
 }
 
 #chat-header {

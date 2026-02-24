@@ -66,6 +66,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebar = document.getElementById('sidebar');
     const mobileStatus = document.getElementById('mobile-status');
 
+    if (sidebarToggle) {
+        sidebarToggle.addEventListener('click', () => {
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('open');
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
+        });
+    }
+
     // Clipboard & Whiteboard (Legacy support)
     const clipboardInput = document.getElementById('clipboard-input');
     const shareClipboardBtn = document.getElementById('share-clipboard-btn');
@@ -370,6 +380,24 @@ Cancel = ${archiveAction}`)) {
             </div>
             ${contentHtml}
         `;
+        // Message Context Menu
+        msgDiv.oncontextmenu = (e) => {
+            e.preventDefault();
+            // Simple confirm for now, custom UI later if needed
+            let options = "Message Options:\n";
+            options += "1. Copy Text\n";
+            if (isMine) options += "2. Delete Message\n";
+
+            const choice = prompt(options + "Enter number:", "");
+            if (choice === "1") {
+                navigator.clipboard.writeText(msg.content);
+            } else if (choice === "2" && isMine) {
+                if (confirm("Delete this message?")) {
+                    socket.emit('delete_message', { message_id: msg.id, room_id: currentRoomId });
+                }
+            }
+        };
+
         msgDiv.appendChild(reactionBar);
         msgDiv.appendChild(reactionsContainer);
         messagesContainer.appendChild(msgDiv);
@@ -480,6 +508,11 @@ Cancel = ${archiveAction}`)) {
 
     socket.on('reaction_removed', (data) => {
          updateReactionsDOM(data.message_id, data.user_id, data.emoji, false);
+    });
+
+    socket.on('message_deleted', (data) => {
+        const el = document.getElementById(`msg-${data.message_id}`);
+        if (el) el.remove();
     });
 
     const updateReactionsDOM = (msgId, userId, emoji, added) => {
@@ -731,8 +764,6 @@ Cancel = ${archiveAction}`)) {
         });
     });
 
-    if (sidebarToggle) sidebarToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
-
     // Theme
     const themeBtn = document.getElementById('theme-toggle');
     const toggleTheme = () => {
@@ -799,34 +830,41 @@ Cancel = ${archiveAction}`)) {
     const toolEraserBtn = document.getElementById('draw-tool-eraser');
     const clearBoardBtn = document.getElementById('clear-board-btn');
 
+    // Whiteboard drawing logic
+    const drawLine = (x0, y0, x1, y1, color, size, emit) => {
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = size;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        ctx.closePath();
+
+        if (emit) {
+            socket.emit('draw', {
+                x0: x0, y0: y0, x1: x1, y1: y1, color: color, size: size
+            });
+        }
+    };
+
     // Attach listeners
     canvas.addEventListener('mousedown', (e) => { isDrawing = true; lastX = e.offsetX; lastY = e.offsetY; });
     canvas.addEventListener('mousemove', (e) => {
         if (!isDrawing) return;
         const color = currentTool === 'eraser' ? '#ffffff' : currentColor;
-        socket.emit('draw', { x0: lastX, y0: lastY, x1: e.offsetX, y1: e.offsetY, color, size: currentSize });
+        // Draw locally AND emit
+        drawLine(lastX, lastY, e.offsetX, e.offsetY, color, currentSize, true);
         lastX = e.offsetX; lastY = e.offsetY;
     });
     canvas.addEventListener('mouseup', () => isDrawing = false);
 
     socket.on('draw', (data) => {
-        ctx.beginPath();
-        ctx.moveTo(data.x0, data.y0);
-        ctx.lineTo(data.x1, data.y1);
-        ctx.strokeStyle = data.color;
-        ctx.lineWidth = data.size;
-        ctx.lineCap = 'round';
-        ctx.stroke();
+        drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
     });
     socket.on('whiteboard_history', (history) => {
         history.forEach(data => {
-            ctx.beginPath();
-            ctx.moveTo(data.x0, data.y0);
-            ctx.lineTo(data.x1, data.y1);
-            ctx.strokeStyle = data.color;
-            ctx.lineWidth = data.size;
-            ctx.lineCap = 'round';
-            ctx.stroke();
+            drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
         });
     });
     socket.on('clear_board', () => ctx.clearRect(0,0,canvas.width,canvas.height));

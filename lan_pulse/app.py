@@ -201,22 +201,146 @@ def handle_join(data):
     # Store SID mapping
     connected_users[request.sid] = user_id
 
+    # Join user-specific room for notifications
+    join_room(user_id)
+
     # Send user info back to client
     emit('user_info', user)
 
-    # Send message history
-    history = database.get_messages(limit=100)
-    emit('message_history', history)
-
-    # Send clipboard history
+    # Send clipboard history (Global)
     clipboard = database.get_clipboard_entries(limit=50)
     emit('clipboard_history', clipboard)
 
-    # Send whiteboard history
+    # Send whiteboard history (Global)
     emit('whiteboard_history', whiteboard_history)
 
+    # Join all chat rooms
+    rooms = database.get_user_rooms(user_id)
+    for room in rooms:
+        join_room(room['id'])
+
+    # Emit room list
+    emit('room_list', rooms)
+
+    # Update online status
     database.update_user_status(user_id, 'online')
-    emit('user_list', database.get_all_users(), broadcast=True)
+
+    # Broadcast global user list (for "Start Chat" modal)
+    emit('global_user_list', database.get_all_users(), broadcast=True)
+
+@socketio.on('enter_room')
+def handle_enter_room(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    room_id = data.get('room_id')
+
+    # Mark read
+    database.mark_room_read(user_id, room_id)
+
+    # Send history
+    history = database.get_messages(room_id=room_id, limit=50)
+    emit('message_history', {'room_id': room_id, 'messages': history})
+
+@socketio.on('mark_read')
+def handle_mark_read(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+    room_id = data.get('room_id')
+    if room_id:
+        database.mark_room_read(user_id, room_id)
+        # Notify user's other sessions to update badges?
+        # We can emit 'room_read' to user_id room
+        emit('room_read', {'room_id': room_id}, room=user_id)
+
+@socketio.on('toggle_pin')
+def handle_toggle_pin(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+    room_id = data.get('room_id')
+    if room_id:
+        database.toggle_pin(user_id, room_id)
+        # Refresh room list
+        rooms = database.get_user_rooms(user_id)
+        emit('room_list', rooms)
+
+@socketio.on('toggle_archive')
+def handle_toggle_archive(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+    room_id = data.get('room_id')
+    if room_id:
+        database.toggle_archive(user_id, room_id)
+        # Refresh room list
+        rooms = database.get_user_rooms(user_id)
+        emit('room_list', rooms)
+
+@socketio.on('create_private_chat')
+def handle_create_private(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    target_user_id = data.get('target_user_id')
+    if not target_user_id: return
+
+    # Check if exists
+    room_id = database.find_private_room(user_id, target_user_id)
+
+    if not room_id:
+        room_id = database.create_room(name=None, room_type='private')
+        database.add_room_member(room_id, user_id)
+        database.add_room_member(room_id, target_user_id)
+
+    # Join both users to the room if they are online
+    join_room(room_id) # Join current user
+
+    # Notify target user to refresh rooms/join
+    # We can use their user_id room to tell them to join
+    emit('new_room_invite', {'room_id': room_id}, room=target_user_id)
+
+    # Return room info to creator
+    room = database.get_room(room_id)
+
+    # Decorate with target user info
+    target_user = database.get_user(target_user_id)
+    room['name'] = target_user['name']
+    room['other_user_color'] = target_user['color']
+    room['other_user_status'] = target_user['status']
+    room['last_message'] = None
+
+    emit('room_created', room)
+
+@socketio.on('join_new_room')
+def handle_join_new_room(data):
+    # Called when client receives 'new_room_invite'
+    room_id = data.get('room_id')
+    join_room(room_id)
+    # Emit updated room list
+    user_id = connected_users.get(request.sid)
+    rooms = database.get_user_rooms(user_id)
+    emit('room_list', rooms)
+
+@socketio.on('create_group_chat')
+def handle_create_group(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    name = data.get('name')
+    member_ids = data.get('members', [])
+
+    if not name: return
+
+    room_id = database.create_room(name=name, room_type='group')
+    database.add_room_member(room_id, user_id, is_admin=1)
+    join_room(room_id)
+
+    for mid in member_ids:
+        database.add_room_member(room_id, mid)
+        emit('new_room_invite', {'room_id': room_id}, room=mid)
+
+    room = database.get_room(room_id)
+    room['last_message'] = None
+    emit('room_created', room)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -224,7 +348,7 @@ def handle_disconnect():
     if user_id:
         print(f"User {user_id} disconnected")
         database.update_user_status(user_id, 'offline')
-        emit('user_list', database.get_all_users(), broadcast=True)
+        emit('global_user_list', database.get_all_users(), broadcast=True)
 
 @socketio.on('send_message')
 def handle_message(data):
@@ -236,16 +360,17 @@ def handle_message(data):
     if not user:
         return
 
-    # Check if muted
     if user.get('is_muted'):
-        return # Ignore
-
-    content = data.get('text', '')
-    if not content:
         return
 
-    msg = database.add_message(user_id, user['name'], user['color'], content)
-    emit('new_message', msg, broadcast=True)
+    content = data.get('text', '')
+    room_id = data.get('room_id')
+
+    if not content or not room_id:
+        return
+
+    msg = database.add_message(user_id, user['name'], user['color'], content, room_id=room_id)
+    emit('new_message', msg, room=room_id)
 
 @socketio.on('send_file')
 def handle_file(data):
@@ -262,12 +387,15 @@ def handle_file(data):
     file_id = data.get('file_id')
     filename = data.get('filename')
     file_type = data.get('file_type')
+    room_id = data.get('room_id')
+
+    if not room_id: return
 
     msg_type = 'image' if file_type.startswith('image/') else 'file'
     content = filename
 
-    msg = database.add_message(user_id, user['name'], user['color'], content, msg_type=msg_type, file_id=file_id)
-    emit('new_message', msg, broadcast=True)
+    msg = database.add_message(user_id, user['name'], user['color'], content, msg_type=msg_type, file_id=file_id, room_id=room_id)
+    emit('new_message', msg, room=room_id)
 
 @socketio.on('send_voice')
 def handle_voice(data):
@@ -280,9 +408,12 @@ def handle_voice(data):
 
     file_id = data.get('file_id')
     duration = data.get('duration')
+    room_id = data.get('room_id')
 
-    msg = database.add_message(user_id, user['name'], user['color'], str(duration), msg_type='voice', file_id=file_id)
-    emit('new_message', msg, broadcast=True)
+    if not room_id: return
+
+    msg = database.add_message(user_id, user['name'], user['color'], str(duration), msg_type='voice', file_id=file_id, room_id=room_id)
+    emit('new_message', msg, room=room_id)
 
 @socketio.on('share_clipboard')
 def handle_clipboard(data):
@@ -317,7 +448,7 @@ def handle_profile_update(data):
         database.update_user_profile(user_id, name, color)
         updated_user = database.get_user(user_id)
         emit('user_info', updated_user)
-        emit('user_list', database.get_all_users(), broadcast=True)
+        emit('global_user_list', database.get_all_users(), broadcast=True)
 
 @socketio.on('add_reaction')
 def handle_add_reaction(data):
@@ -327,13 +458,17 @@ def handle_add_reaction(data):
 
     message_id = data.get('message_id')
     emoji = data.get('emoji')
+    room_id = data.get('room_id')
+
+    if not room_id: return # Need room_id to broadcast efficiently? Or broadcast to room by looking up message?
+    # Optimization: Client sends room_id
 
     if database.add_reaction(message_id, user_id, emoji):
         emit('reaction_added', {
             'message_id': message_id,
             'user_id': user_id,
             'emoji': emoji
-        }, broadcast=True)
+        }, room=room_id)
 
 @socketio.on('remove_reaction')
 def handle_remove_reaction(data):
@@ -343,13 +478,14 @@ def handle_remove_reaction(data):
 
     message_id = data.get('message_id')
     emoji = data.get('emoji')
+    room_id = data.get('room_id')
 
     database.remove_reaction(message_id, user_id, emoji)
     emit('reaction_removed', {
         'message_id': message_id,
         'user_id': user_id,
         'emoji': emoji
-    }, broadcast=True)
+    }, room=room_id)
 
 @socketio.on('draw')
 def handle_draw(data):
@@ -363,12 +499,13 @@ def handle_clear_board():
     emit('clear_board', broadcast=True)
 
 @socketio.on('typing')
-def handle_typing():
+def handle_typing(data):
     user_id = connected_users.get(request.sid)
     if user_id:
         user = database.get_user(user_id)
-        if user:
-            emit('typing', {'username': user['name']}, broadcast=True, include_self=False)
+        room_id = data.get('room_id')
+        if user and room_id:
+            emit('typing', {'username': user['name'], 'room_id': room_id}, room=room_id, include_self=False)
 
 # Admin Socket Events
 @socketio.on('admin_kick_user')
@@ -409,6 +546,7 @@ def handle_broadcast(data):
         return
 
     message = data.get('message')
+    # Broadcast to ALL rooms/users? "broadcast=True" sends to all connected clients regardless of room
     emit('new_message', {
         'id': 0,
         'user_id': 'admin',
@@ -417,7 +555,8 @@ def handle_broadcast(data):
         'content': message,
         'timestamp': time.time(),
         'type': 'text',
-        'reactions': []
+        'reactions': [],
+        'room_id': 'GLOBAL' # Special ID for broadcast
     }, broadcast=True)
 
 if __name__ == '__main__':

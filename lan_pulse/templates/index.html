@@ -21,7 +21,7 @@
             <span id="mobile-status" class="status-indicator"></span>
         </header>
 
-        <!-- Sidebar -->
+        <!-- Main Navigation Sidebar -->
         <aside id="sidebar">
             <div class="sidebar-header">
                 <h2><i class="fa-solid fa-bolt"></i> LAN Pulse</h2>
@@ -39,12 +39,15 @@
                 <button class="nav-btn" data-target="whiteboard-area"><i class="fa-solid fa-pen-to-square"></i> Whiteboard</button>
             </nav>
 
-            <div class="user-list-container">
+            <div class="user-list-container" style="display: none;"> <!-- Hidden, moved to New Chat -->
                 <h3>Users</h3>
                 <ul id="user-list">
                     <!-- Users will be injected here -->
                 </ul>
             </div>
+
+            <div style="flex-grow: 1;"></div>
+
             <div class="my-profile">
                 <div class="avatar" id="my-avatar"></div>
                 <div class="name" id="my-name">Guest</div>
@@ -74,24 +77,57 @@
             </div>
         </main>
 
-        <!-- Main Chat Area -->
-        <main id="chat-area" class="tab-content" style="display: none;">
-            <div id="messages-container">
-                <!-- Messages will be injected here -->
-            </div>
-            <div id="typing-indicator"></div>
-            <div id="input-area">
-                <input type="file" id="file-input" style="display: none;">
-                <button id="file-btn"><i class="fa-solid fa-paperclip"></i></button>
-                <button id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
-                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
-                <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
-            </div>
-            <div id="recording-ui" style="display: none;">
-                <span id="recording-status">Recording...</span>
-                <span id="recording-timer">0:00</span>
-                <button id="cancel-recording"><i class="fa-solid fa-times"></i></button>
-                <button id="stop-recording"><i class="fa-solid fa-check"></i></button>
+        <!-- Main Chat Area (Split View) -->
+        <main id="chat-area" class="tab-content" style="display: none; padding: 0;">
+            <div class="chat-layout">
+                <!-- Chat List Sidebar -->
+                <aside id="chat-sidebar">
+                    <div class="chat-sidebar-header">
+                        <h3>Chats</h3>
+                        <div class="chat-actions">
+                             <button id="new-group-btn" title="New Group"><i class="fa-solid fa-users"></i></button>
+                             <button id="new-chat-btn" title="New Chat"><i class="fa-solid fa-plus"></i></button>
+                        </div>
+                    </div>
+                    <div id="room-list">
+                        <!-- Rooms injected here -->
+                    </div>
+                </aside>
+
+                <!-- Chat Window -->
+                <section id="chat-window">
+                    <div id="chat-header">
+                        <button id="back-to-list-btn" class="mobile-only"><i class="fa-solid fa-arrow-left"></i></button>
+                        <div class="chat-info">
+                            <span id="current-room-name">Select a chat</span>
+                            <span id="current-room-status"></span>
+                        </div>
+                        <div class="chat-options">
+                            <button id="chat-info-btn"><i class="fa-solid fa-circle-info"></i></button>
+                        </div>
+                    </div>
+
+                    <div id="messages-container">
+                        <div class="empty-state">Select a conversation to start chatting</div>
+                    </div>
+
+                    <div id="typing-indicator"></div>
+
+                    <div id="input-area" style="display: none;"> <!-- Hidden initially -->
+                        <input type="file" id="file-input" style="display: none;">
+                        <button id="file-btn"><i class="fa-solid fa-paperclip"></i></button>
+                        <button id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
+                        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                        <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+
+                    <div id="recording-ui" style="display: none;">
+                        <span id="recording-status">Recording...</span>
+                        <span id="recording-timer">0:00</span>
+                        <button id="cancel-recording"><i class="fa-solid fa-times"></i></button>
+                        <button id="stop-recording"><i class="fa-solid fa-check"></i></button>
+                    </div>
+                </section>
             </div>
         </main>
 
@@ -135,6 +171,34 @@
                 <input type="color" id="profile-color">
             </div>
             <button id="save-profile-btn">Save Changes</button>
+        </div>
+    </div>
+
+    <!-- New Chat Modal -->
+    <div id="new-chat-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="close-new-chat">&times;</span>
+            <h2>Start Chat</h2>
+            <ul id="global-user-list" class="user-select-list">
+                <!-- Users injected here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Create Group Modal -->
+    <div id="create-group-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="close-create-group">&times;</span>
+            <h2>New Group</h2>
+            <div class="form-group">
+                <label>Group Name</label>
+                <input type="text" id="group-name-input" placeholder="Enter group name...">
+            </div>
+            <label>Select Members:</label>
+            <ul id="group-user-list" class="user-select-list">
+                <!-- Checkbox list of users -->
+            </ul>
+            <button id="create-group-submit-btn" style="margin-top: 1rem; width: 100%; padding: 0.8rem; background: var(--primary-color); color: white; border: none; border-radius: 4px;">Create Group</button>
         </div>
     </div>
 

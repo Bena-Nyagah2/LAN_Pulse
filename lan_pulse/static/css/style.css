@@ -768,3 +768,216 @@ body, html {
         display: none; /* Hide sidebar on mobile for now, implement toggle later */
     }
 }
+
+/* Chat Layout */
+.chat-layout {
+    display: flex;
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+}
+
+#chat-sidebar {
+    width: 300px;
+    background-color: var(--sidebar-bg);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-sidebar-header {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-actions button {
+    background: none;
+    border: none;
+    color: var(--text-color);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0.2rem 0.5rem;
+}
+
+#room-list {
+    flex-grow: 1;
+    overflow-y: auto;
+}
+
+.room-item {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: background-color 0.2s;
+}
+
+.room-item:hover, .room-item.active {
+    background-color: var(--secondary-color);
+}
+
+.room-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 0.8rem;
+    color: #fff;
+    font-weight: bold;
+    flex-shrink: 0;
+}
+
+.room-info {
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+.room-name {
+    font-weight: bold;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.room-last-msg {
+    font-size: 0.8rem;
+    color: #aaa;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.room-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    margin-left: 0.5rem;
+}
+
+.room-time {
+    font-size: 0.7rem;
+    color: #888;
+}
+
+.unread-badge {
+    background-color: var(--primary-color);
+    color: white;
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 10px;
+    margin-top: 4px;
+    min-width: 10px;
+    text-align: center;
+}
+
+#chat-window {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    position: relative;
+}
+
+#chat-header {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--sidebar-bg);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.chat-info {
+    display: flex;
+    flex-direction: column;
+}
+
+#current-room-name {
+    font-weight: bold;
+}
+
+#current-room-status {
+    font-size: 0.8rem;
+    color: #aaa;
+}
+
+.empty-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #888;
+    font-style: italic;
+}
+
+.mobile-only {
+    display: none;
+}
+
+/* User Select List (Modal) */
+.user-select-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.user-select-list li {
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+}
+
+.user-select-list li:hover {
+    background-color: var(--secondary-color);
+}
+
+/* Checkbox styling for group creation */
+.user-select-list input[type="checkbox"] {
+    margin-right: 1rem;
+    width: 20px;
+    height: 20px;
+}
+
+@media (max-width: 768px) {
+    .mobile-only {
+        display: block;
+        margin-right: 1rem;
+        background: none;
+        border: none;
+        color: var(--text-color);
+        font-size: 1.2rem;
+    }
+
+    #chat-sidebar {
+        width: 100%;
+    }
+
+    #chat-window {
+        display: none; /* Hidden by default on mobile */
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 20;
+    }
+
+    .chat-layout.show-window #chat-sidebar {
+        display: none;
+    }
+
+    .chat-layout.show-window #chat-window {
+        display: flex;
+    }
+}

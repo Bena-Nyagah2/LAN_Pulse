@@ -8,10 +8,19 @@ document.addEventListener('DOMContentLoaded', () => {
             .catch(err => console.log('Service Worker Failed', err));
     }
 
-    const socket = io();
-
-    // --- DOM Elements ---
     const statusEl = document.getElementById('connection-status');
+    let socket;
+    try {
+        socket = io({
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 5
+        });
+    } catch (e) {
+        console.error("Socket init failed:", e);
+        statusEl.innerText = "Error: " + e.message;
+        statusEl.className = "status-indicator status-offline";
+        return;
+    }
 
     // Chat Layout
     const chatLayout = document.querySelector('.chat-layout');
@@ -417,6 +426,11 @@ Cancel = ${archiveAction}`)) {
 
     socket.on('disconnect', () => {
         updateStatus('Offline', 'offline');
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Connection Error:', err);
+        updateStatus('Conn Err: ' + err.message, 'offline');
     });
 
     socket.on('user_info', (user) => {

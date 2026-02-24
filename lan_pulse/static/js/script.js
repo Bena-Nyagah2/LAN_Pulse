@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('LAN Pulse: Initializing v2.1...');
+    console.log('LAN Pulse: Initializing v2.2...');
 
     // Register Service Worker
     if ('serviceWorker' in navigator) {
@@ -208,25 +208,8 @@ OK = ${action}
 Cancel = ${archiveAction}`)) {
              socket.emit('toggle_pin', { room_id: roomId });
         } else {
-             // Hacky way to use confirm for two options. ideally a custom modal.
-             // If user cancels, we treat it as Archive? No, that's bad UX.
-             // Let's simpler: Long press/Right click -> Toggle Pin.
-             // Let's just confirm Pin/Unpin.
-             // Future: Proper context menu.
+             // Basic implementation for now
         }
-    };
-
-    // Better logic: Click triggers select.
-    // Need a UI way to pin/archive.
-    // I will add a small button in room-meta if hovered?
-    // Or just rely on long-press context menu which I implemented above (poorly).
-    // Let's implement specific functions.
-
-    // Revised showRoomOptions
-    // Actually, let's keep it simple: Right click toggles PIN.
-    div.oncontextmenu = (e) => {
-        e.preventDefault();
-        socket.emit('toggle_pin', { room_id: room.id });
     };
 
     const selectRoom = (roomId) => {

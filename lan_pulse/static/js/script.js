@@ -38,6 +38,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const fileBtn = document.getElementById('file-btn');
     const fileInput = document.getElementById('file-input');
     const micBtn = document.getElementById('mic-btn');
+    const chatInfoBtn = document.getElementById('chat-info-btn');
+
+    // Chat Info Modal
+    const chatInfoModal = document.getElementById('chat-info-modal');
+    const closeChatInfo = document.getElementById('close-chat-info');
+    const chatInfoContent = document.getElementById('chat-info-content');
+    const pinChatBtn = document.getElementById('pin-chat-btn');
+
+    // Actions
+    const messageActionsModal = document.getElementById('message-actions-modal');
+    const closeMessageActions = document.getElementById('close-message-actions');
+    const actionReply = document.getElementById('action-reply');
+    const actionForward = document.getElementById('action-forward');
+    const actionCopy = document.getElementById('action-copy');
+    const actionDelete = document.getElementById('action-delete');
+
+    // Forward
+    const forwardModal = document.getElementById('forward-modal');
+    const closeForward = document.getElementById('close-forward');
+    const forwardRoomList = document.getElementById('forward-room-list');
+
+    // Reply State
+    let replyingToMsg = null;
+    const replyPreviewDiv = document.createElement('div');
+    replyPreviewDiv.id = 'reply-preview';
+    replyPreviewDiv.style.display = 'none';
+    replyPreviewDiv.innerHTML = `
+        <div class="reply-text"></div>
+        <button id="cancel-reply" style="background:none;border:none;color:inherit;cursor:pointer;"><i class="fa-solid fa-times"></i></button>
+    `;
+    inputArea.parentNode.insertBefore(replyPreviewDiv, inputArea);
+
+    document.getElementById('cancel-reply').onclick = () => {
+        replyingToMsg = null;
+        replyPreviewDiv.style.display = 'none';
+    };
     const recordingUI = document.getElementById('recording-ui');
     const recordingTimer = document.getElementById('recording-timer');
     const stopRecordingBtn = document.getElementById('stop-recording');
@@ -83,15 +119,29 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
 
-    // Profile
+    // Settings & Profile
     const myProfileDiv = document.querySelector('.my-profile');
-    const profileModal = document.getElementById('profile-modal');
-    const closeModal = document.getElementById('close-modal');
-    const saveProfileBtn = document.getElementById('save-profile-btn');
+    const settingsModal = document.getElementById('settings-modal');
+    const closeSettings = document.getElementById('close-settings');
+    const saveSettingsBtn = document.getElementById('save-settings-btn');
     const profileNameInput = document.getElementById('profile-name');
     const profileColorInput = document.getElementById('profile-color');
     const myNameEl = document.getElementById('my-name');
     const myAvatarEl = document.getElementById('my-avatar');
+
+    // Settings Tabs
+    const settingsTabs = document.querySelectorAll('.settings-tabs .tab-btn');
+    const settingsContents = document.querySelectorAll('.settings-tab');
+
+    settingsTabs.forEach(btn => {
+        btn.onclick = () => {
+            const target = btn.dataset.tab;
+            settingsTabs.forEach(b => b.classList.remove('active'));
+            settingsContents.forEach(c => c.style.display = 'none');
+            btn.classList.add('active');
+            document.getElementById(target).style.display = 'block';
+        };
+    });
 
     // --- State ---
     let myUserId = localStorage.getItem('lan_pulse_user_id');
@@ -380,23 +430,58 @@ Cancel = ${archiveAction}`)) {
             </div>
             ${contentHtml}
         `;
-        // Message Context Menu
-        msgDiv.oncontextmenu = (e) => {
+        // Message Actions (Context Menu)
+        const showActions = (e) => {
             e.preventDefault();
-            // Simple confirm for now, custom UI later if needed
-            let options = "Message Options:\n";
-            options += "1. Copy Text\n";
-            if (isMine) options += "2. Delete Message\n";
 
-            const choice = prompt(options + "Enter number:", "");
-            if (choice === "1") {
+            // Setup Actions
+            actionDelete.style.display = isMine ? 'flex' : 'none';
+
+            // Handlers
+            actionReply.onclick = () => {
+                replyingToMsg = msg;
+                replyPreviewDiv.querySelector('.reply-text').innerText = `Replying to ${msg.username}: ${msg.content.substring(0, 30)}...`;
+                replyPreviewDiv.style.display = 'flex';
+                closeActionsModal();
+                messageInput.focus();
+            };
+
+            actionCopy.onclick = () => {
                 navigator.clipboard.writeText(msg.content);
-            } else if (choice === "2" && isMine) {
+                closeActionsModal();
+            };
+
+            actionDelete.onclick = () => {
                 if (confirm("Delete this message?")) {
                     socket.emit('delete_message', { message_id: msg.id, room_id: currentRoomId });
                 }
-            }
+                closeActionsModal();
+            };
+
+            actionForward.onclick = () => {
+                closeActionsModal();
+                showForwardModal(msg);
+            };
+
+            messageActionsModal.style.display = 'flex';
+            setTimeout(() => messageActionsModal.classList.add('show'), 10);
         };
+
+        const closeActionsModal = () => {
+            messageActionsModal.classList.remove('show');
+            setTimeout(() => messageActionsModal.style.display = 'none', 300);
+        };
+
+        closeMessageActions.onclick = closeActionsModal;
+
+        msgDiv.oncontextmenu = showActions; // Right click
+
+        // Long press for mobile
+        let pressTimer;
+        msgDiv.addEventListener('touchstart', () => {
+            pressTimer = setTimeout(() => showActions({ preventDefault: () => {} }), 800);
+        });
+        msgDiv.addEventListener('touchend', () => clearTimeout(pressTimer));
 
         msgDiv.appendChild(reactionBar);
         msgDiv.appendChild(reactionsContainer);
@@ -558,8 +643,16 @@ Cancel = ${archiveAction}`)) {
 
     const sendMessage = () => {
         if (!currentRoomId) return;
-        const text = messageInput.value.trim();
+        let text = messageInput.value.trim();
         if (text) {
+             // Handle Reply
+             if (replyingToMsg) {
+                 text = `> ${replyingToMsg.content.substring(0, 50)}...\n\n${text}`;
+                 // Clear reply state
+                 replyingToMsg = null;
+                 replyPreviewDiv.style.display = 'none';
+             }
+
              if (socket.connected) {
                   socket.emit('send_message', { text, room_id: currentRoomId });
              } else {
@@ -614,7 +707,10 @@ Cancel = ${archiveAction}`)) {
     fileBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            uploadFile(fileInput.files[0]);
+            // Convert FileList to Array and upload each
+            Array.from(fileInput.files).forEach(file => {
+                uploadFile(file);
+            });
             fileInput.value = '';
         }
     });
@@ -776,20 +872,45 @@ Cancel = ${archiveAction}`)) {
     themeBtn.addEventListener('click', toggleTheme);
     if (localStorage.getItem('theme') === 'light') toggleTheme(); // Initial check
 
-    // Profile
+    // Settings Logic
     myProfileDiv.addEventListener('click', () => {
-        profileModal.style.display = 'flex';
-        setTimeout(() => profileModal.classList.add('show'), 10);
+        settingsModal.style.display = 'flex';
+        setTimeout(() => settingsModal.classList.add('show'), 10);
     });
-    closeModal.addEventListener('click', () => {
-         profileModal.classList.remove('show');
-         setTimeout(() => profileModal.style.display = 'none', 300);
+
+    closeSettings.addEventListener('click', () => {
+         settingsModal.classList.remove('show');
+         setTimeout(() => settingsModal.style.display = 'none', 300);
     });
-    saveProfileBtn.addEventListener('click', () => {
+
+    saveSettingsBtn.addEventListener('click', () => {
+         // Save Profile
          socket.emit('update_profile', { name: profileNameInput.value, color: profileColorInput.value });
-         profileModal.classList.remove('show');
-         setTimeout(() => profileModal.style.display = 'none', 300);
+
+         // Save Other Settings (LocalStorage)
+         const fontSize = document.getElementById('settings-font-size').value;
+         const soundEnabled = document.getElementById('settings-sound').checked;
+
+         document.documentElement.style.fontSize = fontSize === 'small' ? '14px' : fontSize === 'large' ? '18px' : '16px';
+
+         const settings = { fontSize, soundEnabled };
+         localStorage.setItem('lan_pulse_settings', JSON.stringify(settings));
+
+         settingsModal.classList.remove('show');
+         setTimeout(() => settingsModal.style.display = 'none', 300);
     });
+
+    document.getElementById('settings-theme-toggle').onclick = toggleTheme;
+
+    // Load Settings
+    const savedSettings = JSON.parse(localStorage.getItem('lan_pulse_settings') || '{}');
+    if (savedSettings.fontSize) {
+        document.documentElement.style.fontSize = savedSettings.fontSize === 'small' ? '14px' : savedSettings.fontSize === 'large' ? '18px' : '16px';
+        document.getElementById('settings-font-size').value = savedSettings.fontSize;
+    }
+    if (savedSettings.soundEnabled !== undefined) {
+        document.getElementById('settings-sound').checked = savedSettings.soundEnabled;
+    }
 
     // Clipboard
     socket.on('clipboard_history', (history) => {
@@ -849,15 +970,47 @@ Cancel = ${archiveAction}`)) {
     };
 
     // Attach listeners
+    const getTouchPos = (e) => {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.touches[0].clientX - rect.left,
+            y: e.touches[0].clientY - rect.top
+        };
+    };
+
     canvas.addEventListener('mousedown', (e) => { isDrawing = true; lastX = e.offsetX; lastY = e.offsetY; });
     canvas.addEventListener('mousemove', (e) => {
         if (!isDrawing) return;
         const color = currentTool === 'eraser' ? '#ffffff' : currentColor;
-        // Draw locally AND emit
         drawLine(lastX, lastY, e.offsetX, e.offsetY, color, currentSize, true);
         lastX = e.offsetX; lastY = e.offsetY;
     });
     canvas.addEventListener('mouseup', () => isDrawing = false);
+    canvas.addEventListener('mouseout', () => isDrawing = false);
+
+    // Touch support for mobile
+    canvas.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getTouchPos(e);
+        lastX = pos.x;
+        lastY = pos.y;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        if (!isDrawing) return;
+        const pos = getTouchPos(e);
+        const color = currentTool === 'eraser' ? '#ffffff' : currentColor;
+        drawLine(lastX, lastY, pos.x, pos.y, color, currentSize, true);
+        lastX = pos.x;
+        lastY = pos.y;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        isDrawing = false;
+    });
 
     socket.on('draw', (data) => {
         drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
@@ -879,7 +1032,75 @@ Cancel = ${archiveAction}`)) {
     toolPenBtn.addEventListener('click', () => { currentTool = 'pen'; toolPenBtn.classList.add('active'); toolEraserBtn.classList.remove('active'); });
     toolEraserBtn.addEventListener('click', () => { currentTool = 'eraser'; toolEraserBtn.classList.add('active'); toolPenBtn.classList.remove('active'); });
 
+    // Chat Info & Pinning Logic
+    chatInfoBtn.onclick = () => {
+        if (!currentRoomId) return;
+        const room = rooms.find(r => r.id === currentRoomId);
+        if (!room) return;
+
+        let content = `<p><strong>Name:</strong> ${room.name || 'Chat'}</p>`;
+        content += `<p><strong>Type:</strong> ${room.type}</p>`;
+
+        // Members list (simplified for now, ideally fetch from server)
+        content += `<p><strong>Status:</strong> ${currentRoomStatusEl.innerText}</p>`;
+
+        chatInfoContent.innerHTML = content;
+
+        // Update Pin Button State
+        pinChatBtn.innerHTML = room.is_pinned ?
+            '<i class="fa-solid fa-thumbtack-slash"></i> <span>Unpin Chat</span>' :
+            '<i class="fa-solid fa-thumbtack"></i> <span>Pin Chat</span>';
+
+        chatInfoModal.style.display = 'flex';
+        setTimeout(() => chatInfoModal.classList.add('show'), 10);
+    };
+
+    closeChatInfo.onclick = () => {
+        chatInfoModal.classList.remove('show');
+        setTimeout(() => chatInfoModal.style.display = 'none', 300);
+    };
+
+    pinChatBtn.onclick = () => {
+        if (currentRoomId) {
+            socket.emit('toggle_pin', { room_id: currentRoomId });
+            // Close modal after action
+            chatInfoModal.classList.remove('show');
+            setTimeout(() => chatInfoModal.style.display = 'none', 300);
+        }
+    };
+
     // QR Code
     document.getElementById('server-url').innerText = window.location.href;
     new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 128, height: 128 });
+
+    // Forward Logic
+    const showForwardModal = (msg) => {
+        forwardModal.style.display = 'flex';
+        setTimeout(() => forwardModal.classList.add('show'), 10);
+        forwardRoomList.innerHTML = '';
+
+        rooms.forEach(room => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span style="color: var(--primary-color)">${room.name}</span>`;
+            li.onclick = () => {
+                if (confirm(`Forward to ${room.name}?`)) {
+                    // Send as new message with "Forwarded" prefix
+                    // Better: Backend support for type='forward', but simple text prefix works for MVP
+                    socket.emit('send_message', {
+                        text: `*Forwarded from ${msg.username}:*\n${msg.content}`,
+                        room_id: room.id
+                    });
+                    forwardModal.classList.remove('show');
+                    setTimeout(() => forwardModal.style.display = 'none', 300);
+                    alert("Forwarded!");
+                }
+            };
+            forwardRoomList.appendChild(li);
+        });
+    };
+
+    closeForward.onclick = () => {
+        forwardModal.classList.remove('show');
+        setTimeout(() => forwardModal.style.display = 'none', 300);
+    };
 });

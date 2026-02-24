@@ -114,7 +114,7 @@
                     <div id="typing-indicator"></div>
 
                     <div id="input-area" style="display: none;"> <!-- Hidden initially -->
-                        <input type="file" id="file-input" style="display: none;">
+                        <input type="file" id="file-input" multiple style="display: none;">
                         <button id="file-btn"><i class="fa-solid fa-paperclip"></i></button>
                         <button id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
                         <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
@@ -157,20 +157,52 @@
         </main>
     </div>
 
-    <!-- Profile Modal -->
-    <div id="profile-modal" class="modal" style="display: none;">
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal" style="display: none;">
         <div class="modal-content">
-            <span id="close-modal" class="close">&times;</span>
-            <h2>Edit Profile</h2>
-            <div class="form-group">
-                <label for="profile-name">Display Name</label>
-                <input type="text" id="profile-name" maxlength="20">
+            <span class="close" id="close-settings">&times;</span>
+            <h2>Settings</h2>
+            <div class="settings-tabs">
+                <button class="tab-btn active" data-tab="settings-profile">Profile</button>
+                <button class="tab-btn" data-tab="settings-appearance">Appearance</button>
+                <button class="tab-btn" data-tab="settings-notifications">Notifications</button>
             </div>
-            <div class="form-group">
-                <label for="profile-color">Color</label>
-                <input type="color" id="profile-color">
+
+            <div id="settings-profile" class="settings-tab active">
+                <div class="form-group">
+                    <label for="profile-name">Display Name</label>
+                    <input type="text" id="profile-name" maxlength="20">
+                </div>
+                <div class="form-group">
+                    <label for="profile-color">Color</label>
+                    <input type="color" id="profile-color" style="height: 40px; padding: 0; width: 100%;">
+                </div>
             </div>
-            <button id="save-profile-btn">Save Changes</button>
+
+            <div id="settings-appearance" class="settings-tab" style="display: none;">
+                <div class="form-group">
+                    <label>Theme</label>
+                    <button id="settings-theme-toggle" class="btn-secondary">Toggle Dark/Light Mode</button>
+                </div>
+                <div class="form-group">
+                    <label>Font Size</label>
+                    <select id="settings-font-size">
+                        <option value="small">Small</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="large">Large</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="settings-notifications" class="settings-tab" style="display: none;">
+                <div class="form-group">
+                    <label><input type="checkbox" id="settings-sound"> Play Sound on Message</label>
+                </div>
+            </div>
+
+            <div style="margin-top: 2rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                <button id="save-settings-btn" style="background-color: var(--primary-color); color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 4px;">Save All</button>
+            </div>
         </div>
     </div>
 
@@ -181,6 +213,31 @@
             <h2>Start Chat</h2>
             <ul id="global-user-list" class="user-select-list">
                 <!-- Users injected here -->
+            </ul>
+        </div>
+    </div>
+
+    <!-- Message Actions Modal (Bottom Sheet style on mobile) -->
+    <div id="message-actions-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 300px;">
+            <span class="close" id="close-message-actions">&times;</span>
+            <h3>Message Options</h3>
+            <div class="action-list">
+                <button id="action-reply"><i class="fa-solid fa-reply"></i> Reply</button>
+                <button id="action-forward"><i class="fa-solid fa-share"></i> Forward</button>
+                <button id="action-copy"><i class="fa-solid fa-copy"></i> Copy Text</button>
+                <button id="action-delete" style="color: #dc3545;"><i class="fa-solid fa-trash"></i> Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forward Modal -->
+    <div id="forward-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="close-forward">&times;</span>
+            <h2>Forward Message</h2>
+            <ul id="forward-room-list" class="user-select-list">
+                <!-- Rooms injected here -->
             </ul>
         </div>
     </div>
@@ -199,6 +256,20 @@
                 <!-- Checkbox list of users -->
             </ul>
             <button id="create-group-submit-btn" style="margin-top: 1rem; width: 100%; padding: 0.8rem; background: var(--primary-color); color: white; border: none; border-radius: 4px;">Create Group</button>
+        </div>
+    </div>
+
+    <!-- Chat Info Modal -->
+    <div id="chat-info-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close" id="close-chat-info">&times;</span>
+            <h2>Chat Info</h2>
+            <div id="chat-info-content">
+                <!-- Info injected here -->
+            </div>
+            <button id="pin-chat-btn" class="btn-secondary" style="margin-top: 1rem; width: 100%;">
+                <i class="fa-solid fa-thumbtack"></i> <span>Pin Chat</span>
+            </button>
         </div>
     </div>
 

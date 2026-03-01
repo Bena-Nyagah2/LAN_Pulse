@@ -69,7 +69,7 @@
                     <h3><i class="fa-solid fa-pen-to-square"></i> Whiteboard</h3>
                     <p>Collaborate on a real-time drawing canvas.</p>
                 </div>
-                <div class="card" id="qr-card">
+                <div class="card" id="qr-card" data-local-ip="{{ local_ip }}">
                     <h3><i class="fa-solid fa-qrcode"></i> Join via Mobile</h3>
                     <div id="qrcode"></div>
                     <p id="server-url" style="font-size: 0.8rem; color: #aaa; margin-top: 0.5rem;"></p>
@@ -134,6 +134,11 @@
         <!-- Clipboard Area -->
         <main id="clipboard-area" class="tab-content" style="display: none;">
             <div class="clipboard-input-container">
+                <div class="clipboard-toolbar">
+                    <button class="clip-tool" data-format="bold" title="Bold"><i class="fa-solid fa-bold"></i></button>
+                    <button class="clip-tool" data-format="italic" title="Italic"><i class="fa-solid fa-italic"></i></button>
+                    <button class="clip-tool" data-format="code" title="Code"><i class="fa-solid fa-code"></i></button>
+                </div>
                 <textarea id="clipboard-input" placeholder="Paste text or code here..."></textarea>
                 <button id="share-clipboard-btn"><i class="fa-solid fa-share"></i> Share</button>
             </div>

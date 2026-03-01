@@ -44,10 +44,11 @@
         height: calc(100vh - 60px);
         z-index: 1000;
         transition: left 0.3s ease;
+        display: flex !important; /* Force flex display to override inline block/none styles */
     }
 
     #sidebar.open {
-        left: 0;
+        left: 0 !important;
     }
 
     .tab-content {

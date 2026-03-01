@@ -68,7 +68,7 @@ def login_required(f):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', local_ip=get_local_ip())
 
 @app.route('/health')
 def health():
@@ -249,9 +249,10 @@ def handle_mark_read(data):
     room_id = data.get('room_id')
     if room_id:
         database.mark_room_read(user_id, room_id)
-        # Notify user's other sessions to update badges?
-        # We can emit 'room_read' to user_id room
+        # Notify user's other sessions to update badges
         emit('room_read', {'room_id': room_id}, room=user_id)
+        # Broadcast read receipt to room so senders know this user read up to now
+        emit('read_receipt', {'room_id': room_id, 'user_id': user_id, 'timestamp': time.time()}, room=room_id, include_self=False)
 
 @socketio.on('toggle_pin')
 def handle_toggle_pin(data):

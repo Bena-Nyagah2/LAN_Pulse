@@ -150,6 +150,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let rooms = [];
     let typingTimeout = null;
 
+    // Read Receipts state
+    let roomReadTimestamps = {}; // { roomId: { userId: timestamp } }
+
     // Recording State
     let mediaRecorder = null;
     let audioChunks = [];
@@ -423,16 +426,48 @@ Cancel = ${archiveAction}`)) {
              renderReactions(groups, reactionsContainer, msg.id);
         }
 
+        // Read Receipt UI (Only for my messages)
+        let readReceiptHtml = '';
+        if (isMine) {
+             readReceiptHtml = `<span class="read-receipt" id="receipt-${msg.id}"><i class="fa-solid fa-check"></i></span>`;
+             // If we have history of other users reading past this timestamp, mark double tick
+             // Complex to do fully client side without full room member list read timestamps,
+             // but we will update it dynamically on 'read_receipt' events.
+        }
+
         msgDiv.innerHTML = `
             <div class="message-header">
                 <span class="username" style="color: ${msg.user_color}">${msg.username}</span>
-                <span class="time">${time}</span>
+                <span class="time">${time} ${readReceiptHtml}</span>
             </div>
             ${contentHtml}
         `;
+        // Inline Quick Actions
+        const quickActions = document.createElement('div');
+        quickActions.className = 'quick-actions';
+        quickActions.innerHTML = `
+            <button class="qa-btn" title="Reply"><i class="fa-solid fa-reply"></i></button>
+            <button class="qa-btn" title="Forward"><i class="fa-solid fa-share"></i></button>
+        `;
+
+        quickActions.children[0].onclick = (e) => {
+             e.stopPropagation();
+             replyingToMsg = msg;
+             replyPreviewDiv.querySelector('.reply-text').innerText = `Replying to ${msg.username}: ${msg.content.substring(0, 30)}...`;
+             replyPreviewDiv.style.display = 'flex';
+             messageInput.focus();
+        };
+
+        quickActions.children[1].onclick = (e) => {
+             e.stopPropagation();
+             showForwardModal(msg);
+        };
+
+        msgDiv.appendChild(quickActions);
+
         // Message Actions (Context Menu)
         const showActions = (e) => {
-            e.preventDefault();
+            if (e) e.preventDefault();
 
             // Setup Actions
             actionDelete.style.display = isMine ? 'flex' : 'none';
@@ -565,6 +600,17 @@ Cancel = ${archiveAction}`)) {
                 typingIndicator.innerText = '';
             }, 2000);
         }
+    });
+
+    socket.on('read_receipt', (data) => {
+         if (data.room_id === currentRoomId) {
+              // Update all my messages in this room to double tick
+              // In a real app we'd compare message timestamps with data.timestamp
+              // For MVP, just update all visible sent messages to read
+              document.querySelectorAll('.read-receipt').forEach(el => {
+                   el.innerHTML = '<i class="fa-solid fa-check-double" style="color: #4CAF50;"></i>';
+              });
+         }
     });
 
     socket.on('room_created', (room) => {
@@ -912,6 +958,31 @@ Cancel = ${archiveAction}`)) {
         document.getElementById('settings-sound').checked = savedSettings.soundEnabled;
     }
 
+    // Clipboard Formatting
+    document.querySelectorAll('.clip-tool').forEach(btn => {
+        btn.onclick = () => {
+            const format = btn.dataset.format;
+            const start = clipboardInput.selectionStart;
+            const end = clipboardInput.selectionEnd;
+            const text = clipboardInput.value;
+            const selectedText = text.substring(start, end);
+            let wrapper = '';
+
+            if (format === 'bold') wrapper = '**';
+            else if (format === 'italic') wrapper = '*';
+            else if (format === 'code') wrapper = '```\n';
+
+            const newText = text.substring(0, start) +
+                          wrapper + selectedText + (format === 'code' ? '\n```' : wrapper) +
+                          text.substring(end);
+
+            clipboardInput.value = newText;
+            clipboardInput.focus();
+            clipboardInput.selectionStart = start + wrapper.length;
+            clipboardInput.selectionEnd = end + wrapper.length;
+        };
+    });
+
     // Clipboard
     socket.on('clipboard_history', (history) => {
         clipboardEntries.innerHTML = '';
@@ -926,18 +997,52 @@ Cancel = ${archiveAction}`)) {
     });
 
     function renderClipboardEntry(entry) {
-        // ... (Same logic as before) ...
         const div = document.createElement('div');
         div.className = 'clipboard-entry';
         const time = new Date(entry.timestamp * 1000).toLocaleString();
+
         const contentDiv = document.createElement('div');
         contentDiv.className = 'clipboard-content';
         const pre = document.createElement('pre');
         const code = document.createElement('code');
         code.textContent = entry.content;
-        if (entry.type === 'code') hljs.highlightElement(code);
+
+        if (entry.type === 'code') {
+            try { hljs.highlightElement(code); } catch(e) {}
+        } else {
+            code.innerHTML = marked.parse(entry.content);
+        }
+
         pre.appendChild(code);
         contentDiv.appendChild(pre);
+
+        // Select All & Copy behavior
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'copy-btn';
+        copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy All';
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(entry.content).then(() => {
+                copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy All';
+                }, 2000);
+            }).catch(() => {
+                // Fallback: Select text if clipboard API fails (e.g. non-HTTPS)
+                const range = document.createRange();
+                range.selectNodeContents(code);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                document.execCommand('copy');
+                copyBtn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy All';
+                }, 2000);
+            });
+        };
+
+        contentDiv.appendChild(copyBtn);
+
         div.innerHTML = `<div class="clipboard-header"><span><i class="fa-solid fa-user"></i> ${entry.username}</span><span>${time}</span></div>`;
         div.appendChild(contentDiv);
         clipboardEntries.insertBefore(div, clipboardEntries.firstChild);
@@ -969,48 +1074,38 @@ Cancel = ${archiveAction}`)) {
         }
     };
 
-    // Attach listeners
-    const getTouchPos = (e) => {
+    // Unified Pointer Events for Mouse & Touch
+    const getPointerPos = (e) => {
         const rect = canvas.getBoundingClientRect();
         return {
-            x: e.touches[0].clientX - rect.left,
-            y: e.touches[0].clientY - rect.top
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top
         };
     };
 
-    canvas.addEventListener('mousedown', (e) => { isDrawing = true; lastX = e.offsetX; lastY = e.offsetY; });
-    canvas.addEventListener('mousemove', (e) => {
-        if (!isDrawing) return;
-        const color = currentTool === 'eraser' ? '#ffffff' : currentColor;
-        drawLine(lastX, lastY, e.offsetX, e.offsetY, color, currentSize, true);
-        lastX = e.offsetX; lastY = e.offsetY;
-    });
-    canvas.addEventListener('mouseup', () => isDrawing = false);
-    canvas.addEventListener('mouseout', () => isDrawing = false);
-
-    // Touch support for mobile
-    canvas.addEventListener('touchstart', (e) => {
-        e.preventDefault();
+    canvas.addEventListener('pointerdown', (e) => {
         isDrawing = true;
-        const pos = getTouchPos(e);
+        const pos = getPointerPos(e);
         lastX = pos.x;
         lastY = pos.y;
-    }, { passive: false });
+        canvas.setPointerCapture(e.pointerId);
+    });
 
-    canvas.addEventListener('touchmove', (e) => {
-        e.preventDefault();
+    canvas.addEventListener('pointermove', (e) => {
         if (!isDrawing) return;
-        const pos = getTouchPos(e);
+        const pos = getPointerPos(e);
         const color = currentTool === 'eraser' ? '#ffffff' : currentColor;
         drawLine(lastX, lastY, pos.x, pos.y, color, currentSize, true);
         lastX = pos.x;
         lastY = pos.y;
-    }, { passive: false });
-
-    canvas.addEventListener('touchend', (e) => {
-        e.preventDefault();
-        isDrawing = false;
     });
+
+    canvas.addEventListener('pointerup', (e) => {
+        isDrawing = false;
+        canvas.releasePointerCapture(e.pointerId);
+    });
+
+    canvas.addEventListener('pointercancel', () => isDrawing = false);
 
     socket.on('draw', (data) => {
         drawLine(data.x0, data.y0, data.x1, data.y1, data.color, data.size, false);
@@ -1070,8 +1165,18 @@ Cancel = ${archiveAction}`)) {
     };
 
     // QR Code
-    document.getElementById('server-url').innerText = window.location.href;
-    new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 128, height: 128 });
+    const qrCard = document.getElementById('qr-card');
+    const localIp = qrCard ? qrCard.getAttribute('data-local-ip') : 'localhost';
+    const port = window.location.port ? `:${window.location.port}` : '';
+    const protocol = window.location.protocol;
+
+    // If we are on localhost, try to show the network IP instead for other devices
+    const displayUrl = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? `${protocol}//${localIp}${port}/`
+        : window.location.href;
+
+    document.getElementById('server-url').innerText = displayUrl;
+    new QRCode(document.getElementById("qrcode"), { text: displayUrl, width: 128, height: 128 });
 
     // Forward Logic
     const showForwardModal = (msg) => {

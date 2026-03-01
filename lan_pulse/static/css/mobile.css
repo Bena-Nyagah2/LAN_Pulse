@@ -41,10 +41,11 @@
         top: 60px;
         left: -100%;
         width: 100%;
-        height: calc(100vh - 60px);
+        height: calc(100dvh - 60px);
         z-index: 1000;
         transition: left 0.3s ease;
         display: flex !important; /* Force flex display to override inline block/none styles */
+        padding-bottom: env(safe-area-inset-bottom, 1rem); /* iPhone notch support */
     }
 
     #sidebar.open {

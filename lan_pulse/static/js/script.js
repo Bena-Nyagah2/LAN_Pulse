@@ -178,10 +178,30 @@ document.addEventListener('DOMContentLoaded', () => {
     const LOCAL_QUEUE_KEY = 'lan_pulse_queue';
 
     // --- Helpers ---
+    const scrollToBottomBtn = document.getElementById('scroll-to-bottom-btn');
+    let isUserScrolling = false;
 
     const scrollToBottom = () => {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if(scrollToBottomBtn) scrollToBottomBtn.style.display = 'none';
+        isUserScrolling = false;
     };
+
+    messagesContainer.addEventListener('scroll', () => {
+        // If user scrolls up, show FAB
+        const distanceFromBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight;
+        if (distanceFromBottom > 100) {
+            isUserScrolling = true;
+            if(scrollToBottomBtn) scrollToBottomBtn.style.display = 'flex';
+        } else {
+            isUserScrolling = false;
+            if(scrollToBottomBtn) scrollToBottomBtn.style.display = 'none';
+        }
+    });
+
+    if(scrollToBottomBtn) {
+        scrollToBottomBtn.addEventListener('click', scrollToBottom);
+    }
 
     const updateStatus = (text, type) => {
         statusEl.innerText = text;
@@ -387,7 +407,7 @@ Cancel = ${archiveAction}`)) {
         const isMine = msg.user_id === myUser?.id;
         const msgDiv = document.createElement('div');
         msgDiv.className = `message ${isMine ? 'mine' : 'others'}`;
-        msgDiv.id = `msg-${msg.id}`;
+        msgDiv.id = `msg-${msg.id}`; // Explicitly setting ID for scroll-to-reply and deletion
 
         const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -403,7 +423,17 @@ Cancel = ${archiveAction}`)) {
 
                 files.forEach(f => {
                     if (f.type.startsWith('image/')) {
-                        mediaHtml += `<img src="/file/${f.id}" class="message-image" alt="${f.name}">`;
+                        mediaHtml += `
+                            <div class="media-container">
+                                <img src="/file/${f.id}" class="message-image" alt="${f.name}" onclick="window.open(this.src)">
+                                <a href="/file/${f.id}" download="${f.name}" class="media-download-btn"><i class="fa-solid fa-download"></i></a>
+                            </div>`;
+                    } else if (f.type.startsWith('video/')) {
+                        mediaHtml += `
+                            <div class="media-container">
+                                <video src="/file/${f.id}" controls class="message-video"></video>
+                                <a href="/file/${f.id}" download="${f.name}" class="media-download-btn"><i class="fa-solid fa-download"></i></a>
+                            </div>`;
                     } else {
                         mediaHtml += `
                             <a href="/file/${f.id}" class="message-file" download="${f.name}">
@@ -424,7 +454,11 @@ Cancel = ${archiveAction}`)) {
             }
         } else if (msg.type === 'image') {
             // Legacy single image
-            contentHtml = `<img src="/file/${msg.file_id}" class="message-image" alt="${msg.content}">`;
+            contentHtml = `
+                <div class="media-container">
+                    <img src="/file/${msg.file_id}" class="message-image" alt="${msg.content}" onclick="window.open(this.src)">
+                    <a href="/file/${msg.file_id}" download="${msg.content}" class="media-download-btn"><i class="fa-solid fa-download"></i></a>
+                </div>`;
         } else if (msg.type === 'file') {
             // Legacy single file
             contentHtml = `
@@ -478,6 +512,24 @@ Cancel = ${archiveAction}`)) {
             </div>
             ${contentHtml}
         `;
+
+        // Click to scroll to replied message
+        const replyQuote = msgDiv.querySelector('.reply-quote');
+        if (replyQuote) {
+            replyQuote.style.cursor = 'pointer';
+            replyQuote.onclick = (e) => {
+                e.stopPropagation();
+                const refId = replyQuote.getAttribute('data-ref');
+                if (refId) {
+                    const targetMsg = document.getElementById(`msg-${refId}`);
+                    if (targetMsg) {
+                        targetMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        targetMsg.classList.add('highlight-flash');
+                        setTimeout(() => targetMsg.classList.remove('highlight-flash'), 2000);
+                    }
+                }
+            };
+        }
 
         // Inline Quick Actions
         const quickActions = document.createElement('div');
@@ -572,11 +624,16 @@ Cancel = ${archiveAction}`)) {
         msgDiv.appendChild(reactionBar);
         msgDiv.appendChild(reactionsContainer);
         messagesContainer.appendChild(msgDiv);
-        scrollToBottom();
 
-        if (msg.type === 'image') {
-            const img = msgDiv.querySelector('img');
-            img.onload = scrollToBottom;
+        if (!isUserScrolling || isMine) {
+            scrollToBottom();
+        }
+
+        if (msg.type === 'image' || msg.type === 'media') {
+            const imgs = msgDiv.querySelectorAll('img');
+            imgs.forEach(img => {
+                img.onload = () => { if (!isUserScrolling || isMine) scrollToBottom(); };
+            });
         }
     };
 
@@ -744,8 +801,8 @@ Cancel = ${archiveAction}`)) {
         if (text) {
              // Handle Reply
              if (replyingToMsg) {
-                 // Format as a blockquote using our custom class
-                 text = `<blockquote class="reply-quote">${replyingToMsg.username}: ${replyingToMsg.content.replace(/<[^>]+>/g, '').substring(0, 50)}...</blockquote>\n${text}`;
+                 // Format as a blockquote using our custom class with a data-ref
+                 text = `<blockquote class="reply-quote" data-ref="${replyingToMsg.id}">${replyingToMsg.username}: ${replyingToMsg.content.replace(/<[^>]+>/g, '').substring(0, 50)}...</blockquote>\n${text}`;
                  // Clear reply state
                  replyingToMsg = null;
                  replyPreviewDiv.style.display = 'none';
@@ -1333,12 +1390,46 @@ Cancel = ${archiveAction}`)) {
             li.innerHTML = `<span style="color: var(--primary-color)">${room.name}</span>`;
             li.onclick = () => {
                 if (confirm(`Forward to ${room.name}?`)) {
-                    // Send as new message with "Forwarded" prefix
-                    // Better: Backend support for type='forward', but simple text prefix works for MVP
-                    socket.emit('send_message', {
-                        text: `*Forwarded from ${msg.username}:*\n${msg.content}`,
-                        room_id: room.id
-                    });
+                    const fwdPrefix = `*Forwarded from ${msg.username}*`;
+
+                    if (msg.type === 'text') {
+                        socket.emit('send_message', {
+                            text: `${fwdPrefix}:\n${msg.content}`,
+                            room_id: room.id
+                        });
+                    } else if (msg.type === 'media') {
+                        try {
+                            const files = JSON.parse(msg.file_id);
+                            const fileIds = files.map(f => f.id);
+                            const fileNames = files.map(f => f.name);
+                            const fileTypes = files.map(f => f.type);
+                            socket.emit('send_file', {
+                                file_ids: fileIds,
+                                filenames: fileNames,
+                                file_types: fileTypes,
+                                caption: `${fwdPrefix}\n${msg.content !== 'Shared media' ? msg.content : ''}`,
+                                room_id: room.id
+                            });
+                        } catch(e) {}
+                    } else if (msg.type === 'image' || msg.type === 'file') {
+                        // Legacy single file forward (wrap in new media array for consistency)
+                        socket.emit('send_file', {
+                            file_ids: [msg.file_id],
+                            filenames: [msg.content],
+                            file_types: [msg.type === 'image' ? 'image/unknown' : 'application/octet-stream'],
+                            caption: fwdPrefix,
+                            room_id: room.id
+                        });
+                    } else if (msg.type === 'voice') {
+                        socket.emit('send_voice', {
+                            file_id: msg.file_id,
+                            duration: msg.content,
+                            room_id: room.id
+                        });
+                        // Voice captions not fully supported yet, send a follow up text
+                        socket.emit('send_message', { text: fwdPrefix, room_id: room.id });
+                    }
+
                     forwardModal.classList.remove('show');
                     setTimeout(() => forwardModal.style.display = 'none', 300);
                     alert("Forwarded!");

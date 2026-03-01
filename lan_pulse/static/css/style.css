@@ -331,13 +331,44 @@ body, html {
     grid-template-columns: 1fr;
 }
 
-.message-image {
+.media-container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    max-height: 300px;
+}
+
+.message-image, .message-video {
     width: 100%;
     height: 100%;
     object-fit: cover;
     max-height: 300px;
     border-radius: 8px;
     cursor: pointer;
+    background-color: #000;
+}
+
+.media-download-btn {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: rgba(0,0,0,0.6);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+
+.media-download-btn:hover {
+    background: rgba(0,0,0,0.9);
 }
 
 .message-file {
@@ -790,7 +821,7 @@ body, html {
 /* Modal */
 .modal {
     position: fixed;
-    z-index: 100;
+    z-index: 2000;
     left: 0;
     top: 0;
     width: 100%;
@@ -1028,6 +1059,25 @@ body, html {
     overflow: hidden;
 }
 
+.fab-btn {
+    position: absolute;
+    bottom: 80px;
+    right: 20px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    cursor: pointer;
+    z-index: 90;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+}
+
 #chat-header {
     padding: 0.8rem 1rem;
     border-bottom: 1px solid var(--border-color);
@@ -1167,6 +1217,22 @@ body, html {
     max-width: 80%;
     font-style: italic;
     color: var(--text-color);
+}
+
+@keyframes flashHighlight {
+    0% { background-color: rgba(0, 123, 255, 0.5); transform: scale(1.02); }
+    100% { background-color: var(--message-bg-other); transform: scale(1); }
+}
+
+.message.highlight-flash {
+    animation: flashHighlight 2s ease-out;
+}
+.message.mine.highlight-flash {
+    animation: flashHighlightMine 2s ease-out;
+}
+@keyframes flashHighlightMine {
+    0% { background-color: rgba(255, 255, 255, 0.5); transform: scale(1.02); }
+    100% { background-color: var(--message-bg-me); transform: scale(1); }
 }
 
 /* In-Message Quoted Reply */

@@ -12,7 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let socket;
     try {
         socket = io({
-            transports: ['websocket', 'polling'],
+            // Force polling first to avoid Werkzeug's "write before start_response" issue
+            // with raw websocket upgrades on pure threading mode in some environments.
+            transports: ['polling', 'websocket'],
             reconnectionAttempts: 5
         });
     } catch (e) {
@@ -404,7 +406,7 @@ Cancel = ${archiveAction}`)) {
                 </div>`;
         }
 
-        // Reactions
+        // Reactions UI
         const reactionBar = document.createElement('div');
         reactionBar.className = 'reaction-bar';
         commonEmojis.forEach(emoji => {
@@ -413,6 +415,7 @@ Cancel = ${archiveAction}`)) {
             btn.textContent = emoji;
             btn.onclick = () => {
                 socket.emit('add_reaction', { message_id: msg.id, emoji: emoji, room_id: currentRoomId });
+                reactionBar.classList.remove('show');
             };
             reactionBar.appendChild(btn);
         });
@@ -430,9 +433,7 @@ Cancel = ${archiveAction}`)) {
         let readReceiptHtml = '';
         if (isMine) {
              readReceiptHtml = `<span class="read-receipt" id="receipt-${msg.id}"><i class="fa-solid fa-check"></i></span>`;
-             // If we have history of other users reading past this timestamp, mark double tick
-             // Complex to do fully client side without full room member list read timestamps,
-             // but we will update it dynamically on 'read_receipt' events.
+             // Wait for read receipt events to double-tick
         }
 
         msgDiv.innerHTML = `
@@ -442,28 +443,43 @@ Cancel = ${archiveAction}`)) {
             </div>
             ${contentHtml}
         `;
+
         // Inline Quick Actions
         const quickActions = document.createElement('div');
         quickActions.className = 'quick-actions';
         quickActions.innerHTML = `
+            <button class="qa-btn" title="React"><i class="fa-regular fa-face-smile"></i></button>
             <button class="qa-btn" title="Reply"><i class="fa-solid fa-reply"></i></button>
             <button class="qa-btn" title="Forward"><i class="fa-solid fa-share"></i></button>
         `;
 
         quickActions.children[0].onclick = (e) => {
              e.stopPropagation();
+             reactionBar.classList.toggle('show');
+        };
+
+        quickActions.children[1].onclick = (e) => {
+             e.stopPropagation();
              replyingToMsg = msg;
-             replyPreviewDiv.querySelector('.reply-text').innerText = `Replying to ${msg.username}: ${msg.content.substring(0, 30)}...`;
+             replyPreviewDiv.querySelector('.reply-text').innerText = `Replying to ${msg.username}: ${msg.content.replace(/<[^>]+>/g, '').substring(0, 30)}...`;
              replyPreviewDiv.style.display = 'flex';
              messageInput.focus();
         };
 
-        quickActions.children[1].onclick = (e) => {
+        quickActions.children[2].onclick = (e) => {
              e.stopPropagation();
              showForwardModal(msg);
         };
 
         msgDiv.appendChild(quickActions);
+
+        // Mobile tap to show actions
+        msgDiv.addEventListener('click', (e) => {
+            // Don't trigger if clicking a link or button
+            if(e.target.tagName.toLowerCase() === 'button' || e.target.tagName.toLowerCase() === 'a') return;
+            document.querySelectorAll('.message').forEach(m => m.classList.remove('active-msg'));
+            msgDiv.classList.add('active-msg');
+        });
 
         // Message Actions (Context Menu)
         const showActions = (e) => {
@@ -693,7 +709,8 @@ Cancel = ${archiveAction}`)) {
         if (text) {
              // Handle Reply
              if (replyingToMsg) {
-                 text = `> ${replyingToMsg.content.substring(0, 50)}...\n\n${text}`;
+                 // Format as a blockquote using our custom class
+                 text = `<blockquote class="reply-quote">${replyingToMsg.username}: ${replyingToMsg.content.replace(/<[^>]+>/g, '').substring(0, 50)}...</blockquote>\n${text}`;
                  // Clear reply state
                  replyingToMsg = null;
                  replyPreviewDiv.style.display = 'none';
@@ -1166,7 +1183,10 @@ Cancel = ${archiveAction}`)) {
 
     // QR Code
     const qrCard = document.getElementById('qr-card');
-    const localIp = qrCard ? qrCard.getAttribute('data-local-ip') : 'localhost';
+    let localIp = qrCard ? qrCard.getAttribute('data-local-ip') : 'localhost';
+    // If local_ip looks invalid or missing, default
+    if (!localIp || localIp.includes('{{')) localIp = '127.0.0.1';
+
     const port = window.location.port ? `:${window.location.port}` : '';
     const protocol = window.location.protocol;
 
@@ -1176,7 +1196,13 @@ Cancel = ${archiveAction}`)) {
         : window.location.href;
 
     document.getElementById('server-url').innerText = displayUrl;
-    new QRCode(document.getElementById("qrcode"), { text: displayUrl, width: 128, height: 128 });
+
+    // Clear any existing QR code first
+    const qrContainer = document.getElementById("qrcode");
+    if (qrContainer) {
+        qrContainer.innerHTML = '';
+        new QRCode(qrContainer, { text: displayUrl, width: 128, height: 128 });
+    }
 
     // Forward Logic
     const showForwardModal = (msg) => {

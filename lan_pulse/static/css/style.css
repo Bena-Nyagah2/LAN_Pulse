@@ -345,8 +345,7 @@ body, html {
 /* Quick Actions */
 .quick-actions {
     position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
+    top: -15px; /* Hovering above message corner */
     display: none;
     gap: 5px;
     background-color: var(--sidebar-bg);
@@ -358,15 +357,16 @@ body, html {
 }
 
 .message.mine .quick-actions {
-    left: -80px;
+    left: 10px;
 }
 
 .message.others .quick-actions {
-    right: -80px;
+    right: 10px;
 }
 
+/* On desktop hover or mobile active */
 .message:hover .quick-actions,
-.message:active .quick-actions {
+.message.active-msg .quick-actions {
     display: flex;
 }
 
@@ -376,33 +376,41 @@ body, html {
     color: var(--text-color);
     cursor: pointer;
     font-size: 1rem;
-    padding: 4px;
-    transition: color 0.2s;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s, color 0.2s;
 }
 
 .qa-btn:hover {
     color: var(--primary-color);
+    background-color: rgba(0,0,0,0.1);
+}
+[data-theme="dark"] .qa-btn:hover {
+    background-color: rgba(255,255,255,0.1);
 }
 
 /* Reactions */
 .reaction-bar {
     position: absolute;
-    top: -30px;
+    bottom: -15px; /* Shift to bottom for better mobile UX */
     right: 10px;
     background-color: var(--sidebar-bg);
     border-radius: 20px;
     padding: 4px 8px;
-    display: none; /* Hidden by default */
+    display: none;
     box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     border: 1px solid var(--border-color);
     z-index: 10;
-    flex-wrap: wrap;
-    max-width: 200px;
-    justify-content: center;
+    flex-wrap: nowrap; /* Keep it clean */
+    overflow-x: auto; /* Allow scrolling if too many */
+    max-width: calc(100% - 20px);
 }
 
-.message:hover .reaction-bar,
-.message:active .reaction-bar { /* Show on touch/active for mobile */
+.reaction-bar.show {
     display: flex;
     gap: 5px;
 }
@@ -749,6 +757,7 @@ body, html {
     background-color: #ffffff;
     cursor: crosshair;
     box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    touch-action: none; /* Prevents mobile scrolling/shaking while drawing */
 }
 
 /* Modal */
@@ -1112,13 +1121,16 @@ body, html {
 
 /* Reply Preview */
 #reply-preview {
-    background-color: var(--secondary-color);
+    background-color: rgba(0, 123, 255, 0.1);
     padding: 0.5rem 1rem;
     border-left: 4px solid var(--primary-color);
     display: flex;
     justify-content: space-between;
     align-items: center;
     font-size: 0.9rem;
+    margin: 0.5rem 1rem 0 1rem;
+    border-radius: 4px 4px 0 0;
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
 }
 
 #reply-preview .reply-text {
@@ -1126,17 +1138,25 @@ body, html {
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 80%;
+    font-style: italic;
+    color: var(--text-color);
 }
 
+/* In-Message Quoted Reply */
 .reply-quote {
-    border-left: 2px solid var(--primary-color);
-    padding-left: 0.5rem;
+    border-left: 3px solid var(--primary-color);
+    padding: 0.4rem 0.6rem;
     margin-bottom: 0.5rem;
-    font-size: 0.9rem;
-    opacity: 0.8;
-    background-color: rgba(0,0,0,0.1);
-    border-radius: 0 4px 4px 0;
-    padding: 4px;
+    font-size: 0.85rem;
+    color: inherit;
+    opacity: 0.85;
+    background-color: rgba(0,0,0,0.15);
+    border-radius: 0 6px 6px 0;
+    font-style: italic;
+    display: block;
+}
+[data-theme="light"] .reply-quote {
+    background-color: rgba(255,255,255,0.5);
 }
 
 @media (max-width: 768px) {

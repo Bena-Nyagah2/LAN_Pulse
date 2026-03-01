@@ -385,17 +385,28 @@ def handle_file(data):
 
     if user.get('is_muted'): return
 
-    file_id = data.get('file_id')
-    filename = data.get('filename')
-    file_type = data.get('file_type')
+    file_ids = data.get('file_ids')
+    filenames = data.get('filenames')
+    file_types = data.get('file_types')
+    caption = data.get('caption', '')
     room_id = data.get('room_id')
 
-    if not room_id: return
+    if not room_id or not file_ids: return
 
-    msg_type = 'image' if file_type.startswith('image/') else 'file'
-    content = filename
+    # Store multiple file metadata as JSON in file_id column or content
+    import json
+    file_data = []
+    for i in range(len(file_ids)):
+        file_data.append({
+            'id': file_ids[i],
+            'name': filenames[i],
+            'type': file_types[i]
+        })
 
-    msg = database.add_message(user_id, user['name'], user['color'], content, msg_type=msg_type, file_id=file_id, room_id=room_id)
+    msg_type = 'media' # generic media type for multiple files
+    content = caption if caption else "Shared media"
+
+    msg = database.add_message(user_id, user['name'], user['color'], content, msg_type=msg_type, file_id=json.dumps(file_data), room_id=room_id)
     emit('new_message', msg, room=room_id)
 
 @socketio.on('send_voice')

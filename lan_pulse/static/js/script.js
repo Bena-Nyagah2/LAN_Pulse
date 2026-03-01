@@ -99,18 +99,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const navBtns = document.querySelectorAll('.nav-btn');
     const tabContents = document.querySelectorAll('.tab-content');
 
-    // Mobile Sidebar
-    const sidebarToggle = document.getElementById('sidebar-toggle');
+    // Sidebar Toggles
+    const sidebarToggle = document.getElementById('sidebar-toggle'); // Mobile Header Toggle
+    const desktopSidebarToggle = document.getElementById('desktop-sidebar-toggle'); // Desktop Inner Toggle
     const sidebar = document.getElementById('sidebar');
     const mobileStatus = document.getElementById('mobile-status');
 
     if (sidebarToggle) {
         sidebarToggle.addEventListener('click', () => {
-            if (window.innerWidth <= 768) {
-                sidebar.classList.toggle('open');
-            } else {
-                sidebar.classList.toggle('collapsed');
-            }
+            sidebar.classList.toggle('open');
+        });
+    }
+
+    if (desktopSidebarToggle) {
+        desktopSidebarToggle.addEventListener('click', () => {
+            sidebar.classList.toggle('collapsed');
         });
     }
 
@@ -160,6 +163,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let audioChunks = [];
     let recordingStartTime = 0;
     let recordingInterval = null;
+    let isRecordingPaused = false;
+    let totalRecordedTime = 0;
 
     // Whiteboard State
     let isDrawing = false;
@@ -389,9 +394,39 @@ Cancel = ${archiveAction}`)) {
         let contentHtml = '';
         if (msg.type === 'text') {
             contentHtml = `<div class="message-content">${marked.parse(msg.content)}</div>`;
+        } else if (msg.type === 'media') {
+            // New multiple media format
+            try {
+                const files = JSON.parse(msg.file_id);
+                const isSingle = files.length === 1;
+                let mediaHtml = `<div class="media-grid ${isSingle ? 'single' : ''}">`;
+
+                files.forEach(f => {
+                    if (f.type.startsWith('image/')) {
+                        mediaHtml += `<img src="/file/${f.id}" class="message-image" alt="${f.name}">`;
+                    } else {
+                        mediaHtml += `
+                            <a href="/file/${f.id}" class="message-file" download="${f.name}">
+                                <i class="fa-solid fa-file"></i> <span>${f.name}</span>
+                            </a>`;
+                    }
+                });
+                mediaHtml += `</div>`;
+
+                // Caption
+                if (msg.content !== "Shared media") {
+                    mediaHtml += `<div class="message-content" style="margin-top:0.5rem;">${marked.parse(msg.content)}</div>`;
+                }
+                contentHtml = mediaHtml;
+
+            } catch(e) {
+                contentHtml = `<div class="message-content">Error loading media</div>`;
+            }
         } else if (msg.type === 'image') {
+            // Legacy single image
             contentHtml = `<img src="/file/${msg.file_id}" class="message-image" alt="${msg.content}">`;
         } else if (msg.type === 'file') {
+            // Legacy single file
             contentHtml = `
                 <a href="/file/${msg.file_id}" class="message-file" download="${msg.content}">
                     <i class="fa-solid fa-file"></i>
@@ -745,36 +780,86 @@ Cancel = ${archiveAction}`)) {
         if (currentRoomId) socket.emit('typing', { room_id: currentRoomId });
     });
 
-    // --- File Upload ---
+    // --- File Upload & Preview ---
+    const filePreviewModal = document.getElementById('file-preview-modal');
+    const filePreviewList = document.getElementById('file-preview-list');
+    const fileCaptionInput = document.getElementById('file-caption-input');
+    let pendingUploadFiles = [];
 
-    const uploadFile = async (file) => {
-        if (!file || !currentRoomId) return;
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('user_id', myUserId);
+    const showFilePreview = (files) => {
+        pendingUploadFiles = Array.from(files);
+        filePreviewList.innerHTML = '';
 
-        try {
-            const response = await fetch('/upload', { method: 'POST', body: formData });
-            if (response.ok) {
-                const data = await response.json();
-                socket.emit('send_file', {
-                    file_id: data.file_id,
-                    filename: data.filename,
-                    file_type: data.file_type,
-                    room_id: currentRoomId
-                });
+        pendingUploadFiles.forEach(file => {
+            const div = document.createElement('div');
+            div.style.marginBottom = '5px';
+            if (file.type.startsWith('image/')) {
+                const img = document.createElement('img');
+                img.src = URL.createObjectURL(file);
+                img.style.maxHeight = '100px';
+                img.style.display = 'block';
+                div.appendChild(img);
+            } else {
+                div.innerHTML = `<i class="fa-solid fa-file"></i> ${file.name}`;
             }
-        } catch(e) { console.error(e); }
+            filePreviewList.appendChild(div);
+        });
+
+        fileCaptionInput.value = '';
+        filePreviewModal.style.display = 'flex';
+        setTimeout(() => filePreviewModal.classList.add('show'), 10);
+        fileCaptionInput.focus();
+    };
+
+    const closeFilePreview = () => {
+        filePreviewModal.classList.remove('show');
+        setTimeout(() => filePreviewModal.style.display = 'none', 300);
+        pendingUploadFiles = [];
+        fileInput.value = '';
+    };
+
+    document.getElementById('close-file-preview').onclick = closeFilePreview;
+    document.getElementById('cancel-upload-btn').onclick = closeFilePreview;
+
+    document.getElementById('confirm-upload-btn').onclick = async () => {
+        const caption = fileCaptionInput.value.trim();
+        // Upload sequentially for simplicity, collect IDs
+        const fileIds = [];
+        const fileTypes = [];
+        const fileNames = [];
+
+        for (const file of pendingUploadFiles) {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('user_id', myUserId);
+
+            try {
+                const response = await fetch('/upload', { method: 'POST', body: formData });
+                if (response.ok) {
+                    const data = await response.json();
+                    fileIds.push(data.file_id);
+                    fileTypes.push(data.file_type);
+                    fileNames.push(data.filename);
+                }
+            } catch(e) { console.error("Upload failed", e); }
+        }
+
+        if (fileIds.length > 0 && currentRoomId) {
+             socket.emit('send_file', {
+                 file_ids: fileIds, // Send as array
+                 filenames: fileNames,
+                 file_types: fileTypes,
+                 caption: caption,
+                 room_id: currentRoomId
+             });
+        }
+        closeFilePreview();
     };
 
     fileBtn.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
         if (fileInput.files.length > 0) {
-            // Convert FileList to Array and upload each
-            Array.from(fileInput.files).forEach(file => {
-                uploadFile(file);
-            });
-            fileInput.value = '';
+            showFilePreview(fileInput.files);
         }
     });
 
@@ -802,14 +887,45 @@ Cancel = ${archiveAction}`)) {
             mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
             mediaRecorder.start();
 
+            isRecordingPaused = false;
+            totalRecordedTime = 0;
             recordingUI.style.display = 'flex';
+            document.getElementById('recording-status').classList.add('active');
+            document.getElementById('recording-status').innerHTML = '<i class="fa-solid fa-circle"></i> Recording';
+            document.getElementById('pause-recording').innerHTML = '<i class="fa-solid fa-pause"></i>';
             recordingStartTime = Date.now();
-            recordingTimer.innerText = "0:00";
+
             recordingInterval = setInterval(() => {
-                const elapsed = Math.floor((Date.now() - recordingStartTime)/1000);
-                recordingTimer.innerText = `${Math.floor(elapsed/60)}:${(elapsed%60).toString().padStart(2,'0')}`;
+                if(!isRecordingPaused) {
+                    totalRecordedTime = Math.floor((Date.now() - recordingStartTime)/1000);
+                    recordingTimer.innerText = `${Math.floor(totalRecordedTime/60)}:${(totalRecordedTime%60).toString().padStart(2,'0')}`;
+                }
             }, 1000);
-        } catch(e) { alert("Mic error"); }
+        } catch(e) { alert("Mic error or denied permission."); }
+    };
+
+    const pauseRecording = () => {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.pause();
+            isRecordingPaused = true;
+            document.getElementById('recording-status').classList.remove('active');
+            document.getElementById('recording-status').innerHTML = '<i class="fa-solid fa-pause"></i> Paused';
+            document.getElementById('pause-recording').innerHTML = '<i class="fa-solid fa-play"></i>';
+            clearInterval(recordingInterval);
+        } else if (mediaRecorder && mediaRecorder.state === 'paused') {
+            mediaRecorder.resume();
+            isRecordingPaused = false;
+            recordingStartTime = Date.now() - (totalRecordedTime * 1000); // Adjust start time
+            document.getElementById('recording-status').classList.add('active');
+            document.getElementById('recording-status').innerHTML = '<i class="fa-solid fa-circle"></i> Recording';
+            document.getElementById('pause-recording').innerHTML = '<i class="fa-solid fa-pause"></i>';
+            recordingInterval = setInterval(() => {
+                if(!isRecordingPaused) {
+                    totalRecordedTime = Math.floor((Date.now() - recordingStartTime)/1000);
+                    recordingTimer.innerText = `${Math.floor(totalRecordedTime/60)}:${(totalRecordedTime%60).toString().padStart(2,'0')}`;
+                }
+            }, 1000);
+        }
     };
 
     const stopRecording = (save) => {
@@ -818,7 +934,7 @@ Cancel = ${archiveAction}`)) {
                 mediaRecorder.stream.getTracks().forEach(t => t.stop());
                 if (save) {
                     const blob = new Blob(audioChunks, { type: 'audio/webm' });
-                    uploadAudio(blob, (Date.now() - recordingStartTime)/1000);
+                    uploadAudio(blob, totalRecordedTime);
                 }
             };
             mediaRecorder.stop();
@@ -828,6 +944,8 @@ Cancel = ${archiveAction}`)) {
     };
 
     if (micBtn) micBtn.addEventListener('click', startRecording);
+    const pauseBtnEl = document.getElementById('pause-recording');
+    if (pauseBtnEl) pauseBtnEl.addEventListener('click', pauseRecording);
     if (stopRecordingBtn) stopRecordingBtn.addEventListener('click', () => stopRecording(true));
     if (cancelRecordingBtn) cancelRecordingBtn.addEventListener('click', () => stopRecording(false));
 

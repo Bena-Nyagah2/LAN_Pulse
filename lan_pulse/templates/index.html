@@ -24,7 +24,8 @@
         <!-- Main Navigation Sidebar -->
         <aside id="sidebar">
             <div class="sidebar-header">
-                <h2><i class="fa-solid fa-bolt"></i> LAN Pulse</h2>
+                <button id="desktop-sidebar-toggle" class="btn-secondary" style="border:none; padding:0; background:transparent; font-size:1.2rem; display:none; margin-bottom: 1rem;"><i class="fa-solid fa-bars"></i></button>
+                <h2><i class="fa-solid fa-bolt"></i> <span>LAN Pulse</span></h2>
                 <span id="connection-status" class="status-indicator">Connecting...</span>
             </div>
 
@@ -33,10 +34,10 @@
             </button>
 
             <nav id="main-nav">
-                <button class="nav-btn active" data-target="dashboard-area"><i class="fa-solid fa-house"></i> Home</button>
-                <button class="nav-btn" data-target="chat-area"><i class="fa-solid fa-comments"></i> Chat</button>
-                <button class="nav-btn" data-target="clipboard-area"><i class="fa-solid fa-clipboard"></i> Clipboard</button>
-                <button class="nav-btn" data-target="whiteboard-area"><i class="fa-solid fa-pen-to-square"></i> Whiteboard</button>
+                <button class="nav-btn active" data-target="dashboard-area"><i class="fa-solid fa-house"></i> <span>Home</span></button>
+                <button class="nav-btn" data-target="chat-area"><i class="fa-solid fa-comments"></i> <span>Chat</span></button>
+                <button class="nav-btn" data-target="clipboard-area"><i class="fa-solid fa-clipboard"></i> <span>Clipboard</span></button>
+                <button class="nav-btn" data-target="whiteboard-area"><i class="fa-solid fa-pen-to-square"></i> <span>Whiteboard</span></button>
             </nav>
 
             <div class="user-list-container" style="display: none;"> <!-- Hidden, moved to New Chat -->
@@ -122,10 +123,14 @@
                     </div>
 
                     <div id="recording-ui" style="display: none;">
-                        <span id="recording-status">Recording...</span>
-                        <span id="recording-timer">0:00</span>
-                        <button id="cancel-recording"><i class="fa-solid fa-times"></i></button>
-                        <button id="stop-recording"><i class="fa-solid fa-check"></i></button>
+                        <div style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+                            <button id="cancel-recording" class="rec-btn cancel"><i class="fa-solid fa-trash"></i></button>
+                            <span id="recording-status"><i class="fa-solid fa-circle"></i> Recording</span>
+                            <span id="recording-timer">0:00</span>
+                            <div style="flex-grow:1"></div>
+                            <button id="pause-recording" class="rec-btn"><i class="fa-solid fa-pause"></i></button>
+                            <button id="stop-recording" class="rec-btn send"><i class="fa-solid fa-paper-plane"></i></button>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -261,6 +266,24 @@
                 <!-- Checkbox list of users -->
             </ul>
             <button id="create-group-submit-btn" style="margin-top: 1rem; width: 100%; padding: 0.8rem; background: var(--primary-color); color: white; border: none; border-radius: 4px;">Create Group</button>
+        </div>
+    </div>
+
+    <!-- File Preview & Caption Modal -->
+    <div id="file-preview-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" id="close-file-preview">&times;</span>
+            <h2>Send File(s)</h2>
+            <div id="file-preview-list" style="max-height: 200px; overflow-y: auto; margin-bottom: 1rem; border: 1px solid var(--border-color); padding: 0.5rem; border-radius: 4px;">
+                <!-- Previews injected here -->
+            </div>
+            <div class="form-group">
+                <input type="text" id="file-caption-input" placeholder="Add a caption..." autocomplete="off">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                <button id="cancel-upload-btn" class="btn-secondary">Cancel</button>
+                <button id="confirm-upload-btn" style="background-color: var(--primary-color); color: white; padding: 0.8rem 1.5rem; border: none; border-radius: 4px;"><i class="fa-solid fa-paper-plane"></i> Send</button>
+            </div>
         </div>
     </div>
 

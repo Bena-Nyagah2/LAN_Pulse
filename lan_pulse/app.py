@@ -183,6 +183,16 @@ def serve_file(file_id):
 def handle_connect():
     print(f"Client connected: {request.sid}")
 
+@socketio.on('register_user')
+def handle_register(data):
+    name = data.get('name', f"User{random.randint(1000, 9999)}")
+    color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
+    user_id = database.create_user(name, color)
+    user = {'id': user_id, 'name': name, 'color': color}
+    emit('user_registered', user)
+    # Automatically join them after registration
+    handle_join({'user_id': user_id})
+
 @socketio.on('join')
 def handle_join(data):
     user_id = data.get('user_id')
@@ -192,11 +202,8 @@ def handle_join(data):
         user = database.get_user(user_id)
 
     if not user:
-        # Create new user
-        name = f"User{random.randint(1000, 9999)}"
-        color = "#{:06x}".format(random.randint(0, 0xFFFFFF))
-        user_id = database.create_user(name, color)
-        user = {'id': user_id, 'name': name, 'color': color}
+        emit('user_not_found')
+        return
 
     # Store SID mapping
     connected_users[request.sid] = user_id

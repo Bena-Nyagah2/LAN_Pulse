@@ -124,6 +124,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
 
+    // Welcome Screen
+    const welcomeScreen = document.getElementById('welcome-screen');
+    const welcomeJoinBtn = document.getElementById('welcome-join-btn');
+    const welcomeUsernameInput = document.getElementById('welcome-username');
+
     // Settings & Profile
     const myProfileDiv = document.querySelector('.my-profile');
     const settingsModal = document.getElementById('settings-modal');
@@ -419,18 +424,25 @@ Cancel = ${archiveAction}`)) {
             try {
                 const files = JSON.parse(msg.file_id);
                 const isSingle = files.length === 1;
-                let mediaHtml = `<div class="media-grid ${isSingle ? 'single' : ''}">`;
+                let mediaHtml = `<div class="media-grid ${isSingle ? 'single' : ''}" id="grid-${msg.id}">`;
 
-                files.forEach(f => {
+                files.forEach((f, idx) => {
+                    let overlayHtml = '';
+                    if (idx === 3 && files.length > 4) {
+                         overlayHtml = `<div class="more-media-overlay" onclick="document.getElementById('grid-${msg.id}').classList.add('expanded')">+${files.length - 4}</div>`;
+                    }
+
                     if (f.type.startsWith('image/')) {
                         mediaHtml += `
                             <div class="media-container">
+                                ${overlayHtml}
                                 <img src="/file/${f.id}" class="message-image" alt="${f.name}" onclick="window.open(this.src)">
                                 <a href="/file/${f.id}" download="${f.name}" class="media-download-btn"><i class="fa-solid fa-download"></i></a>
                             </div>`;
                     } else if (f.type.startsWith('video/')) {
                         mediaHtml += `
                             <div class="media-container">
+                                ${overlayHtml}
                                 <video src="/file/${f.id}" controls class="message-video"></video>
                                 <a href="/file/${f.id}" download="${f.name}" class="media-download-btn"><i class="fa-solid fa-download"></i></a>
                             </div>`;
@@ -505,9 +517,18 @@ Cancel = ${archiveAction}`)) {
              // Wait for read receipt events to double-tick
         }
 
+        // Only show username in group chats or if not mine
+        const currentRoom = rooms.find(r => r.id === currentRoomId);
+        const isGroup = currentRoom && currentRoom.type === 'group';
+
+        let usernameHtml = '';
+        if (isGroup && !isMine) {
+             usernameHtml = `<span class="username" style="color: ${msg.user_color}">${msg.username}</span>`;
+        }
+
         msgDiv.innerHTML = `
             <div class="message-header">
-                <span class="username" style="color: ${msg.user_color}">${msg.username}</span>
+                ${usernameHtml}
                 <span class="time">${time} ${readReceiptHtml}</span>
             </div>
             ${contentHtml}
@@ -656,10 +677,41 @@ Cancel = ${archiveAction}`)) {
 
     // --- Socket Events ---
 
+    // --- Auth Flow ---
+    const handleAuth = () => {
+        if (!myUserId) {
+            welcomeScreen.style.display = 'flex';
+        } else {
+            socket.emit('join', { user_id: myUserId });
+        }
+    };
+
+    welcomeJoinBtn.onclick = () => {
+        const name = welcomeUsernameInput.value.trim() || 'Guest';
+        socket.emit('register_user', { name: name });
+        welcomeJoinBtn.innerText = 'Joining...';
+        welcomeJoinBtn.disabled = true;
+    };
+
+    socket.on('user_registered', (user) => {
+        myUserId = user.id;
+        localStorage.setItem('lan_pulse_user_id', user.id);
+        welcomeScreen.style.display = 'none';
+    });
+
+    socket.on('user_not_found', () => {
+        // ID in localstorage is invalid/deleted from server DB
+        myUserId = null;
+        localStorage.removeItem('lan_pulse_user_id');
+        welcomeScreen.style.display = 'flex';
+    });
+
+    // --- Socket Events ---
+
     socket.on('connect', () => {
         console.log('Connected');
         updateStatus('Connected', 'online');
-        socket.emit('join', { user_id: myUserId });
+        handleAuth();
         processQueue();
     });
 
@@ -681,6 +733,7 @@ Cancel = ${archiveAction}`)) {
         myAvatarEl.innerText = user.name.substring(0, 2).toUpperCase();
         profileNameInput.value = user.name;
         profileColorInput.value = user.color;
+        welcomeScreen.style.display = 'none'; // Ensure hidden if auth succeeds
     });
 
     socket.on('room_list', (data) => {

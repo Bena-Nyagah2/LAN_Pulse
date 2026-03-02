@@ -13,6 +13,18 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
 </head>
 <body>
+    <!-- Welcome / Login Screen -->
+    <div id="welcome-screen" style="display: none;">
+        <div class="welcome-box">
+            <h2><i class="fa-solid fa-bolt"></i> LAN Pulse</h2>
+            <p>Welcome to the local network chat.</p>
+            <div class="form-group">
+                <input type="text" id="welcome-username" placeholder="Enter your display name" maxlength="20">
+            </div>
+            <button id="welcome-join-btn">Join Chat</button>
+        </div>
+    </div>
+
     <div id="app">
         <!-- Mobile Header -->
         <header id="mobile-header">

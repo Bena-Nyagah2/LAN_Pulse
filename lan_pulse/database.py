@@ -26,13 +26,28 @@ def init_db():
     )''')
 
     # Rooms table
-    c.execute('''CREATE TABLE IF NOT EXISTS rooms (
-        id TEXT PRIMARY KEY,
-        name TEXT,
-        type TEXT, -- 'private' or 'group'
-        created_at REAL,
-        last_message_at REAL
-    )''')
+    c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rooms'")
+    if c.fetchone():
+        c.execute("PRAGMA table_info(rooms)")
+        columns = [info[1] for info in c.fetchall()]
+        if 'avatar_url' not in columns: c.execute("ALTER TABLE rooms ADD COLUMN avatar_url TEXT")
+        if 'description' not in columns: c.execute("ALTER TABLE rooms ADD COLUMN description TEXT")
+        if 'member_limit' not in columns: c.execute("ALTER TABLE rooms ADD COLUMN member_limit INTEGER DEFAULT 50")
+        if 'invite_code' not in columns: c.execute("ALTER TABLE rooms ADD COLUMN invite_code TEXT")
+        if 'invite_restriction' not in columns: c.execute("ALTER TABLE rooms ADD COLUMN invite_restriction INTEGER DEFAULT 0") # 0=All, 1=Admins
+    else:
+        c.execute('''CREATE TABLE IF NOT EXISTS rooms (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            type TEXT, -- 'private' or 'group'
+            created_at REAL,
+            last_message_at REAL,
+            avatar_url TEXT,
+            description TEXT,
+            member_limit INTEGER DEFAULT 50,
+            invite_code TEXT,
+            invite_restriction INTEGER DEFAULT 0
+        )''')
 
     # Room Members table
     # Check if exists to migrate
@@ -176,13 +191,14 @@ def unmute_user(user_id):
     conn.close()
 
 # Room operations
-def create_room(name, room_type='group'):
+def create_room(name, room_type='group', description='', avatar_url=''):
     room_id = str(uuid.uuid4())
+    invite_code = str(uuid.uuid4())[:8] if room_type == 'group' else None
     conn = get_db()
     c = conn.cursor()
     timestamp = time.time()
-    c.execute("INSERT INTO rooms (id, name, type, created_at, last_message_at) VALUES (?, ?, ?, ?, ?)",
-              (room_id, name, room_type, timestamp, timestamp))
+    c.execute("INSERT INTO rooms (id, name, type, created_at, last_message_at, description, avatar_url, invite_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+              (room_id, name, room_type, timestamp, timestamp, description, avatar_url, invite_code))
     conn.commit()
     conn.close()
     return room_id
@@ -350,13 +366,77 @@ def get_messages(room_id, limit=50):
     conn.close()
     return messages[::-1]
 
-def delete_message(message_id):
+def delete_message(message_id, user_id=None):
     conn = get_db()
     c = conn.cursor()
-    c.execute("DELETE FROM messages WHERE id = ?", (message_id,))
-    c.execute("DELETE FROM reactions WHERE message_id = ?", (message_id,))
+
+    # Check permissions
+    c.execute("SELECT user_id, room_id FROM messages WHERE id = ?", (message_id,))
+    msg = c.fetchone()
+    if not msg:
+        conn.close()
+        return False
+
+    sender_id = msg['user_id']
+    room_id = msg['room_id']
+
+    can_delete = False
+    if user_id == sender_id:
+        can_delete = True
+    elif user_id and room_id:
+        # Check if user is admin in the room
+        c.execute("SELECT is_admin FROM room_members WHERE room_id = ? AND user_id = ?", (room_id, user_id))
+        member = c.fetchone()
+        if member and member['is_admin'] == 1:
+            can_delete = True
+
+    if can_delete:
+        c.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+        c.execute("DELETE FROM reactions WHERE message_id = ?", (message_id,))
+        conn.commit()
+        conn.close()
+        return True
+
+    conn.close()
+    return False
+
+def update_group_info(room_id, name, description, avatar_url):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE rooms SET name = ?, description = ?, avatar_url = ? WHERE id = ?",
+              (name, description, avatar_url, room_id))
     conn.commit()
     conn.close()
+
+def remove_room_member(room_id, user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM room_members WHERE room_id = ? AND user_id = ?", (room_id, user_id))
+    conn.commit()
+    conn.close()
+
+def promote_member(room_id, user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("UPDATE room_members SET is_admin = 1 WHERE room_id = ? AND user_id = ?", (room_id, user_id))
+    conn.commit()
+    conn.close()
+
+def get_room_by_invite(invite_code):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM rooms WHERE invite_code = ?", (invite_code,))
+    room = c.fetchone()
+    conn.close()
+    return dict(room) if room else None
+
+def get_room_member(room_id, user_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT * FROM room_members WHERE room_id = ? AND user_id = ?", (room_id, user_id))
+    member = c.fetchone()
+    conn.close()
+    return dict(member) if member else None
 
 # File operations
 def add_file(filename, filepath, file_type, size, uploader_id):

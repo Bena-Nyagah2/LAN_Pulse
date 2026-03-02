@@ -93,6 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeCreateGroup = document.getElementById('close-create-group');
     const groupUserListEl = document.getElementById('group-user-list');
     const groupNameInput = document.getElementById('group-name-input');
+    const groupDescInput = document.getElementById('group-desc-input');
     const createGroupSubmitBtn = document.getElementById('create-group-submit-btn');
 
     // Navigation
@@ -594,7 +595,19 @@ Cancel = ${archiveAction}`)) {
             if (e) e.preventDefault();
 
             // Setup Actions
-            actionDelete.style.display = isMine ? 'flex' : 'none';
+            // Admins can delete any message. Current user can delete their own.
+            let canDelete = isMine;
+            if (!canDelete && currentRoomId) {
+                const currentRoom = rooms.find(r => r.id === currentRoomId);
+                // In a full app, we'd check if `myUserId` is in the room's admin list.
+                // For MVP, if it's a group, we assume creator/admin logic is handled server-side,
+                // but we should show the button if they *might* be an admin, or fetch admin status.
+                // To be safe, we will show it, and the server will reject if unauthorized.
+                if (currentRoom && currentRoom.type === 'group') {
+                     canDelete = true;
+                }
+            }
+            actionDelete.style.display = canDelete ? 'flex' : 'none';
 
             // Handlers
             actionReply.onclick = () => {
@@ -683,6 +696,15 @@ Cancel = ${archiveAction}`)) {
             welcomeScreen.style.display = 'flex';
         } else {
             socket.emit('join', { user_id: myUserId });
+
+            // Check for invite code in URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const inviteCode = urlParams.get('invite');
+            if (inviteCode) {
+                socket.emit('join_by_invite', { invite_code: inviteCode });
+                // Clean URL
+                window.history.replaceState({}, document.title, "/");
+            }
         }
     };
 
@@ -697,6 +719,14 @@ Cancel = ${archiveAction}`)) {
         myUserId = user.id;
         localStorage.setItem('lan_pulse_user_id', user.id);
         welcomeScreen.style.display = 'none';
+
+        // Check for invite after registration
+        const urlParams = new URLSearchParams(window.location.search);
+        const inviteCode = urlParams.get('invite');
+        if (inviteCode) {
+            socket.emit('join_by_invite', { invite_code: inviteCode });
+            window.history.replaceState({}, document.title, "/");
+        }
     });
 
     socket.on('user_not_found', () => {
@@ -1115,12 +1145,13 @@ Cancel = ${archiveAction}`)) {
 
     createGroupSubmitBtn.addEventListener('click', () => {
         const name = groupNameInput.value.trim();
+        const description = groupDescInput.value.trim();
         if (!name) return alert("Enter group name");
 
         const selected = [];
         groupUserListEl.querySelectorAll('input:checked').forEach(cb => selected.push(cb.value));
 
-        socket.emit('create_group_chat', { name, members: selected });
+        socket.emit('create_group_chat', { name, description, members: selected });
     });
 
     // --- Legacy Features (Clipboard/Whiteboard) ---
@@ -1378,11 +1409,29 @@ Cancel = ${archiveAction}`)) {
         const room = rooms.find(r => r.id === currentRoomId);
         if (!room) return;
 
-        let content = `<p><strong>Name:</strong> ${room.name || 'Chat'}</p>`;
-        content += `<p><strong>Type:</strong> ${room.type}</p>`;
+        let content = `<div style="text-align: center; margin-bottom: 1rem;">`;
+        let avatarColor = room.type === 'private' ? (room.other_user_color || '#ccc') : '#555';
+        let avatarText = room.type === 'private' ? (room.name ? room.name.substring(0, 2).toUpperCase() : '??') : '<i class="fa-solid fa-users"></i>';
 
-        // Members list (simplified for now, ideally fetch from server)
-        content += `<p><strong>Status:</strong> ${currentRoomStatusEl.innerText}</p>`;
+        content += `<div class="room-avatar" style="background-color: ${avatarColor}; margin: 0 auto 0.5rem auto; width: 64px; height: 64px; font-size: 1.5rem;">${avatarText}</div>`;
+        content += `<h3>${room.name || 'Chat'}</h3>`;
+        content += `<p style="color: var(--system-msg-color);">${room.type === 'private' ? 'Direct Message' : 'Group'}</p>`;
+        content += `</div>`;
+
+        if (room.type === 'group' && room.description) {
+             content += `<div style="background: var(--secondary-color); padding: 0.5rem; border-radius: 4px; margin-bottom: 1rem;"><p style="margin:0; font-size:0.9rem;">${room.description}</p></div>`;
+        }
+
+        if (room.type === 'group' && room.invite_code) {
+             const inviteLink = `${window.location.origin}/?invite=${room.invite_code}`;
+             content += `<div style="margin-bottom: 1rem;">
+                <label style="font-size: 0.8rem; color: #aaa;">Invite Link</label>
+                <div style="display: flex; gap: 0.5rem;">
+                    <input type="text" readonly value="${inviteLink}" style="flex:1; padding:0.5rem; border-radius:4px; border:1px solid var(--border-color); background:var(--bg-color); color:var(--text-color);">
+                    <button class="btn-secondary" onclick="navigator.clipboard.writeText('${inviteLink}'); alert('Copied!');"><i class="fa-solid fa-copy"></i></button>
+                </div>
+             </div>`;
+        }
 
         chatInfoContent.innerHTML = content;
 

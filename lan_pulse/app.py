@@ -334,11 +334,15 @@ def handle_create_group(data):
     if not user_id: return
 
     name = data.get('name')
+    description = data.get('description', '')
     member_ids = data.get('members', [])
 
     if not name: return
 
-    room_id = database.create_room(name=name, room_type='group')
+    # Generate auto-avatar if none provided (client side usually handles this, but backend stores it)
+    avatar_url = data.get('avatar_url', '')
+
+    room_id = database.create_room(name=name, room_type='group', description=description, avatar_url=avatar_url)
     database.add_room_member(room_id, user_id, is_admin=1)
     join_room(room_id)
 
@@ -349,6 +353,94 @@ def handle_create_group(data):
     room = database.get_room(room_id)
     room['last_message'] = None
     emit('room_created', room)
+
+    user = database.get_user(user_id)
+    # Send system message
+    sys_msg = database.add_message('system', 'SYSTEM', '#888888', f"{user['name']} created the group.", type='system', room_id=room_id)
+    emit('new_message', sys_msg, room=room_id)
+
+@socketio.on('join_by_invite')
+def handle_join_by_invite(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    invite_code = data.get('invite_code')
+    if not invite_code: return
+
+    room = database.get_room_by_invite(invite_code)
+    if room:
+        # Check limit
+        members = database.get_room_members(room['id'])
+        if len(members) >= room['member_limit']:
+            emit('error', {'message': 'Group is full'})
+            return
+
+        database.add_room_member(room['id'], user_id)
+        join_room(room['id'])
+
+        # Refresh user's room list
+        rooms = database.get_user_rooms(user_id)
+        emit('room_list', rooms)
+
+        user = database.get_user(user_id)
+        sys_msg = database.add_message('system', 'SYSTEM', '#888888', f"{user['name']} joined via invite link.", type='system', room_id=room['id'])
+        emit('new_message', sys_msg, room=room['id'])
+
+@socketio.on('update_group_info')
+def handle_update_group_info(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    room_id = data.get('room_id')
+    name = data.get('name')
+    description = data.get('description')
+    avatar_url = data.get('avatar_url')
+
+    member = database.get_room_member(room_id, user_id)
+    if member and member['is_admin'] == 1:
+        database.update_group_info(room_id, name, description, avatar_url)
+        # Notify room of update
+        emit('group_info_updated', {'room_id': room_id, 'name': name, 'description': description, 'avatar_url': avatar_url}, room=room_id)
+
+        user = database.get_user(user_id)
+        sys_msg = database.add_message('system', 'SYSTEM', '#888888', f"{user['name']} updated the group info.", type='system', room_id=room_id)
+        emit('new_message', sys_msg, room=room_id)
+
+@socketio.on('kick_member')
+def handle_kick_member(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    room_id = data.get('room_id')
+    target_id = data.get('target_id')
+
+    member = database.get_room_member(room_id, user_id)
+    if member and member['is_admin'] == 1:
+        database.remove_room_member(room_id, target_id)
+
+        target_user = database.get_user(target_id)
+        user = database.get_user(user_id)
+        sys_msg = database.add_message('system', 'SYSTEM', '#888888', f"{target_user['name']} was removed by {user['name']}.", type='system', room_id=room_id)
+        emit('new_message', sys_msg, room=room_id)
+
+        # Tell target to leave
+        emit('removed_from_room', {'room_id': room_id}, room=target_id)
+
+@socketio.on('leave_room')
+def handle_leave_room(data):
+    user_id = connected_users.get(request.sid)
+    if not user_id: return
+
+    room_id = data.get('room_id')
+    database.remove_room_member(room_id, user_id)
+    leave_room(room_id)
+
+    user = database.get_user(user_id)
+    sys_msg = database.add_message('system', 'SYSTEM', '#888888', f"{user['name']} left the group.", type='system', room_id=room_id)
+    emit('new_message', sys_msg, room=room_id)
+
+    rooms = database.get_user_rooms(user_id)
+    emit('room_list', rooms)
 
 @socketio.on('disconnect')
 def handle_disconnect():
@@ -515,11 +607,9 @@ def handle_delete_message(data):
     message_id = data.get('message_id')
     room_id = data.get('room_id')
 
-    # We should verify ownership, but database.delete_message doesn't check owner yet.
-    # In a real app, get_message(message_id) -> check user_id.
-    # For MVP/Simplicity:
-    database.delete_message(message_id)
-    emit('message_deleted', {'message_id': message_id}, room=room_id)
+    success = database.delete_message(message_id, user_id=user_id)
+    if success:
+        emit('message_deleted', {'message_id': message_id}, room=room_id)
 
 @socketio.on('draw')
 def handle_draw(data):

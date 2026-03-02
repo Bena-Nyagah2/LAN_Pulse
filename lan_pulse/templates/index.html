@@ -130,9 +130,11 @@
 
                     <div id="input-area" style="display: none;"> <!-- Hidden initially -->
                         <input type="file" id="file-input" multiple style="display: none;">
-                        <button id="file-btn"><i class="fa-solid fa-paperclip"></i></button>
-                        <button id="mic-btn"><i class="fa-solid fa-microphone"></i></button>
-                        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                        <div class="input-wrapper">
+                            <button id="file-btn" title="Attach"><i class="fa-solid fa-paperclip"></i></button>
+                            <input type="text" id="message-input" placeholder="Message..." autocomplete="off">
+                            <button id="mic-btn" title="Record Voice"><i class="fa-solid fa-microphone"></i></button>
+                        </div>
                         <button id="send-btn"><i class="fa-solid fa-paper-plane"></i></button>
                     </div>
 
@@ -274,6 +276,10 @@
             <div class="form-group">
                 <label>Group Name</label>
                 <input type="text" id="group-name-input" placeholder="Enter group name...">
+            </div>
+            <div class="form-group">
+                <label>Description (Optional)</label>
+                <input type="text" id="group-desc-input" placeholder="What's this group for?">
             </div>
             <label>Select Members:</label>
             <ul id="group-user-list" class="user-select-list">
